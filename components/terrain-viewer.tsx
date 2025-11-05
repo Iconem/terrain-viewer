@@ -6,6 +6,7 @@ import Map, { Source, Layer, NavigationControl, GeolocateControl, type MapRef } 
 import "@maplibre/maplibre-gl-geocoder/dist/maplibre-gl-geocoder.css"
 import { TerrainControls } from "./terrain-controls"
 import { terrainSources } from "@/lib/terrain-sources"
+import { colorRamps } from "@/lib/color-ramps"
 import type { TerrainSource } from "@/lib/terrain-types"
 
 export function TerrainViewer() {
@@ -16,6 +17,7 @@ export function TerrainViewer() {
   const [mapLibreReady, setMapLibreReady] = useState(false)
   const [contoursInitialized, setContoursInitialized] = useState(false)
   const demSourceRef = useRef<any>(null)
+  const [mapsLoaded, setMapsLoaded] = useState(false)
 
   const terrainRasterUrls: Record<string, string> = {
     osm: "https://a.tile.openstreetmap.org/{z}/{x}/{y}.png",
@@ -32,7 +34,7 @@ export function TerrainViewer() {
     showHillshade: parseAsBoolean.withDefault(true),
     hillshadeOpacity: parseAsFloat.withDefault(1.0),
     showColorRelief: parseAsBoolean.withDefault(false),
-    colorReliefOpacity: parseAsFloat.withDefault(1.0),
+    colorReliefOpacity: parseAsFloat.withDefault(0.35),
     showContours: parseAsBoolean.withDefault(false),
     colorRamp: parseAsString.withDefault("hypsometric"),
     showTerrain: parseAsBoolean.withDefault(false),
@@ -53,6 +55,8 @@ export function TerrainViewer() {
     hillshadeMethod: parseAsString.withDefault("standard"),
     contourMinor: parseAsFloat.withDefault(50),
     contourMajor: parseAsFloat.withDefault(200),
+    minElevation: parseAsFloat.withDefault(0),
+    maxElevation: parseAsFloat.withDefault(4000),
     mapboxKey: parseAsString.withDefault(""),
     googleKey: parseAsString.withDefault(""),
     maptilerKey: parseAsString.withDefault(""),
@@ -65,13 +69,19 @@ export function TerrainViewer() {
   const supportsShadowColor = ["standard", "combined", "igor", "basic"].includes(state.hillshadeMethod)
   const supportsHighlightColor = ["standard", "combined", "igor", "basic"].includes(state.hillshadeMethod)
   const supportsAccentColor = state.hillshadeMethod === "standard"
-  const supportsExaggeration = ["standard", "combined", "multidirectional"].includes(state.hillshadeMethod)
+  const supportsExaggeration = ["standard", "combined", "multidirectional", "multidir-colors"].includes(
+    state.hillshadeMethod,
+  )
 
   const hillshadePaint = useMemo(() => {
     const paint: any = {}
 
     if (state.hillshadeMethod === "multidirectional") {
-      // Multidirectional with multiple colored light sources
+      paint["hillshade-method"] = "multidirectional"
+      if (supportsExaggeration) {
+        paint["hillshade-exaggeration"] = state.hillshadeExag
+      }
+    } else if (state.hillshadeMethod === "multidir-colors") {
       paint["hillshade-method"] = "multidirectional"
       paint["hillshade-highlight-color"] = ["#ff8080", "#80ff80", "#80c0ff"]
       paint["hillshade-shadow-color"] = ["#4040ff", "#8000ff", "#0040ff"]
@@ -85,10 +95,14 @@ export function TerrainViewer() {
         paint["hillshade-illumination-direction"] = state.illuminationDir
       }
       if (supportsShadowColor) {
-        paint["hillshade-shadow-color"] = state.shadowColor
+        const shadowRgb = hexToRgb(state.shadowColor)
+        paint["hillshade-shadow-color"] =
+          `rgba(${shadowRgb.r}, ${shadowRgb.g}, ${shadowRgb.b}, ${state.hillshadeOpacity})`
       }
       if (supportsHighlightColor) {
-        paint["hillshade-highlight-color"] = state.highlightColor
+        const highlightRgb = hexToRgb(state.highlightColor)
+        paint["hillshade-highlight-color"] =
+          `rgba(${highlightRgb.r}, ${highlightRgb.g}, ${highlightRgb.b}, ${state.hillshadeOpacity})`
       }
       if (supportsIlluminationAltitude) {
         paint["hillshade-illumination-altitude"] = state.illuminationAlt
@@ -113,6 +127,7 @@ export function TerrainViewer() {
     state.hillshadeExag,
     state.accentColor,
     state.hillshadeMethod,
+    state.hillshadeOpacity,
     supportsIlluminationDirection,
     supportsIlluminationAltitude,
     supportsShadowColor,
@@ -122,13 +137,14 @@ export function TerrainViewer() {
   ])
 
   const colorReliefPaint = useMemo(() => {
+    const ramp = colorRamps[state.colorRamp]
+    if (!ramp) return {}
+
     return {
-      "hillshade-illumination-direction": 0,
-      "hillshade-exaggeration": 0,
-      "hillshade-shadow-color": "#000000",
-      "hillshade-highlight-color": "#FFFFFF",
+      "color-relief-opacity": state.colorReliefOpacity,
+      "color-relief-color": ramp.colors,
     }
-  }, [])
+  }, [state.colorRamp, state.colorReliefOpacity])
 
   useEffect(() => {
     const checkMapLibre = () => {
@@ -143,7 +159,7 @@ export function TerrainViewer() {
 
   useEffect(() => {
     const loadGeocoder = async () => {
-      if (!mapARef.current || geocoderLoaded || !mapLibreReady) return
+      if (!mapARef.current || geocoderLoaded || !mapLibreReady || !mapsLoaded) return
 
       try {
         const MaplibreGeocoder = (await import("@maplibre/maplibre-gl-geocoder")).default
@@ -181,6 +197,8 @@ export function TerrainViewer() {
               features,
             }
           },
+          placeholder: "Search",
+          language: "en",
         })
         mapARef.current.getMap().addControl(geocoder, "top-left")
         setGeocoderLoaded(true)
@@ -189,23 +207,49 @@ export function TerrainViewer() {
       }
     }
 
-    if (mapARef.current && !geocoderLoaded && mapLibreReady) {
+    if (mapsLoaded) {
       setTimeout(loadGeocoder, 1000)
     }
-  }, [geocoderLoaded, mapLibreReady])
+  }, [geocoderLoaded, mapLibreReady, mapsLoaded])
 
   useEffect(() => {
     const initContours = async () => {
-      if (!mapARef.current || contoursInitialized || !mapLibreReady) return
+      if (!mapARef.current || contoursInitialized || !mapLibreReady || !mapsLoaded) {
+        console.log("[v0] Contours init skipped:", {
+          hasMap: !!mapARef.current,
+          contoursInitialized,
+          mapLibreReady,
+          mapsLoaded,
+        })
+        return
+      }
 
       try {
+        console.log("[v0] Initializing contours...")
         const mlcontour = await import("maplibre-contour")
         const maplibregl = (window as any).maplibregl
 
         const source = terrainSources[state.sourceA as TerrainSource]
-        if (!source?.sourceConfig?.tiles?.[0]) return
+        if (!source?.sourceConfig?.tiles?.[0]) {
+          console.log("[v0] No source tiles found")
+          return
+        }
 
-        demSourceRef.current = new (mlcontour as any).DemSource({
+        let DemSource = mlcontour.DemSource
+        if (!DemSource && (mlcontour as any).default) {
+          DemSource = (mlcontour as any).default.DemSource || (mlcontour as any).default
+        }
+        if (!DemSource) {
+          console.error("[v0] DemSource not found in maplibre-contour module", Object.keys(mlcontour))
+          return
+        }
+
+        console.log("[v0] Creating DemSource with:", {
+          url: source.sourceConfig.tiles[0],
+          encoding: source.encoding === "terrainrgb" ? "mapbox" : "terrarium",
+        })
+
+        demSourceRef.current = new DemSource({
           url: source.sourceConfig.tiles[0],
           encoding: source.encoding === "terrainrgb" ? "mapbox" : "terrarium",
           maxzoom: source.sourceConfig.maxzoom || 14,
@@ -238,27 +282,30 @@ export function TerrainViewer() {
           maxzoom: 15,
         })
 
+        console.log("[v0] Contours initialized successfully")
         setContoursInitialized(true)
       } catch (error) {
-        console.error("Failed to initialize contours:", error)
+        console.error("[v0] Failed to initialize contours:", error)
       }
     }
 
-    if (mapARef.current && !contoursInitialized && mapLibreReady) {
-      setTimeout(initContours, 2000)
+    if (mapsLoaded && !contoursInitialized) {
+      const timer = setTimeout(initContours, 2000)
+      return () => clearTimeout(timer)
     }
-  }, [contoursInitialized, mapLibreReady, state.sourceA, state.contourMinor, state.contourMajor])
+  }, [contoursInitialized, mapLibreReady, mapsLoaded, state.sourceA, state.contourMinor, state.contourMajor])
 
   const onMoveEndA = useCallback(
     (evt: any) => {
       if (!isSyncing.current) {
-        setState({
+        const newState = {
           lat: Number.parseFloat(evt.viewState.latitude.toFixed(4)),
           lng: Number.parseFloat(evt.viewState.longitude.toFixed(4)),
           zoom: Number.parseFloat(evt.viewState.zoom.toFixed(2)),
           pitch: Number.parseFloat(evt.viewState.pitch.toFixed(1)),
           bearing: Number.parseFloat(evt.viewState.bearing.toFixed(1)),
-        })
+        }
+        setState(newState, { shallow: true })
       }
     },
     [setState],
@@ -313,18 +360,19 @@ export function TerrainViewer() {
         }}
         onMove={mapId === "map-a" ? onMoveA : undefined}
         onMoveEnd={mapId === "map-a" ? onMoveEndA : undefined}
+        onLoad={() => {
+          if (mapId === "map-a") {
+            setMapsLoaded(true)
+          }
+        }}
         maxPitch={state.viewMode === "2d" ? 0 : 85}
         pitchWithRotate={state.viewMode !== "2d"}
         dragRotate={state.viewMode !== "2d"}
         touchZoomRotate={state.viewMode !== "2d"}
-        terrain={
-          state.viewMode === "3d" || state.viewMode === "globe"
-            ? {
-                source: "terrainSource",
-                exaggeration: state.exaggeration,
-              }
-            : undefined
-        }
+        terrain={{
+          source: "terrainSource",
+          exaggeration: state.exaggeration,
+        }}
         projection={state.viewMode === "globe" ? "globe" : "mercator"}
         mapStyle={{
           version: 8,
@@ -366,15 +414,17 @@ export function TerrainViewer() {
           }}
         />
 
-        <Layer
-          id="color-relief"
-          type="hillshade"
-          source="hillshadeSource"
-          paint={colorReliefPaint}
-          layout={{
-            visibility: state.showColorRelief ? "visible" : "none",
-          }}
-        />
+        {state.showColorRelief && (
+          <Layer
+            id="color-relief"
+            type="color-relief"
+            source="hillshadeSource"
+            paint={colorReliefPaint}
+            layout={{
+              visibility: "visible",
+            }}
+          />
+        )}
 
         {contoursInitialized && mapId === "map-a" && (
           <>
@@ -444,4 +494,15 @@ export function TerrainViewer() {
       <TerrainControls state={state} setState={setState} getMapBounds={getMapBounds} mapRef={mapARef} />
     </div>
   )
+}
+
+function hexToRgb(hex: string): { r: number; g: number; b: number } {
+  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex)
+  return result
+    ? {
+        r: Number.parseInt(result[1], 16),
+        g: Number.parseInt(result[2], 16),
+        b: Number.parseInt(result[3], 16),
+      }
+    : { r: 0, g: 0, b: 0 }
 }

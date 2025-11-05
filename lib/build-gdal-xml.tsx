@@ -1,4 +1,4 @@
-export function buildGdalWmsXml(tileUrl: string): string {
+export function buildGdalWmsXml(tileUrl: string, tileSize = 256): string {
   // Extract the base URL pattern from the tile URL
   const serverUrl = tileUrl.replace(/{z}/g, "${z}").replace(/{x}/g, "${x}").replace(/{y}/g, "${y}")
 
@@ -17,8 +17,8 @@ export function buildGdalWmsXml(tileUrl: string): string {
     <YOrigin>top</YOrigin>
   </DataWindow>
   <Projection>EPSG:3857</Projection>
-  <BlockSizeX>256</BlockSizeX>
-  <BlockSizeY>256</BlockSizeY>
+  <BlockSizeX>${tileSize}</BlockSizeX>
+  <BlockSizeY>${tileSize}</BlockSizeY>
   <BandsCount>3</BandsCount>
   <Cache />
 </GDAL_WMS>`

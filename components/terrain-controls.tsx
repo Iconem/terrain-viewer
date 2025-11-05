@@ -2,7 +2,8 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import { useAtom } from "jotai"
 import {
   Camera,
   ChevronDown,
@@ -11,6 +12,7 @@ import {
   Copy,
   Download,
   ExternalLink,
+  Globe,
   Info,
   Moon,
   PanelRightClose,
@@ -19,7 +21,6 @@ import {
   Settings,
   Sun,
 } from "lucide-react"
-import { domToBlob } from "modern-screenshot"
 import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
@@ -43,6 +44,14 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { terrainSources } from "@/lib/terrain-sources"
 import { colorRamps } from "@/lib/color-ramps"
 import { buildGdalWmsXml } from "@/lib/build-gdal-xml"
+import {
+  mapboxKeyAtom,
+  googleKeyAtom,
+  maptilerKeyAtom,
+  titilerEndpointAtom,
+  maxResolutionAtom,
+  themeAtom,
+} from "@/lib/settings-atoms"
 import type { MapRef } from "react-map-gl/maplibre"
 
 interface TerrainControlsProps {
@@ -67,17 +76,30 @@ export function TerrainControls({ state, setState, getMapBounds, mapRef }: Terra
   const [showAdvancedRamps, setShowAdvancedRamps] = useState(false)
   const [batchEditMode, setBatchEditMode] = useState(false)
   const [batchApiKeys, setBatchApiKeys] = useState("")
-  const [theme, setTheme] = useState<"light" | "dark">("light")
+  // Removed theme state as it's now managed by Jotai atom
+
+  const [mapboxKey, setMapboxKey] = useAtom(mapboxKeyAtom)
+  const [googleKey, setGoogleKey] = useAtom(googleKeyAtom)
+  const [maptilerKey, setMaptilerKey] = useAtom(maptilerKeyAtom)
+  const [titilerEndpoint, setTitilerEndpoint] = useAtom(titilerEndpointAtom)
+  const [maxResolution, setMaxResolution] = useAtom(maxResolutionAtom)
+  const [theme, setTheme] = useAtom(themeAtom)
+
+  useEffect(() => {
+    document.documentElement.classList.toggle("dark", theme === "dark")
+  }, [theme])
 
   const supportsIlluminationDirection = ["standard", "combined", "igor", "basic"].includes(state.hillshadeMethod)
   const supportsIlluminationAltitude = ["combined", "basic"].includes(state.hillshadeMethod)
   const supportsShadowColor = ["standard", "combined", "igor", "basic"].includes(state.hillshadeMethod)
   const supportsHighlightColor = ["standard", "combined", "igor", "basic"].includes(state.hillshadeMethod)
   const supportsAccentColor = state.hillshadeMethod === "standard"
-  const supportsExaggeration = ["standard", "combined", "multidirectional"].includes(state.hillshadeMethod)
+  const supportsExaggeration = ["standard", "combined", "multidirectional", "multidir-colors"].includes(
+    state.hillshadeMethod,
+  )
 
   const colorRampKeys = Object.keys(colorRamps)
-  const hillshadeMethodKeys = ["standard", "combined", "igor", "basic", "multidirectional"]
+  const hillshadeMethodKeys = ["standard", "combined", "igor", "basic", "multidirectional", "multidir-colors"]
   const terrainSourceKeys = ["osm", "google", "esri", "mapbox"]
 
   const cycleColorRamp = (direction: number) => {
@@ -106,11 +128,12 @@ export function TerrainControls({ state, setState, getMapBounds, mapRef }: Terra
     const source = terrainSources[state.sourceA]
     if (!source?.sourceConfig?.tiles?.[0]) return ""
     const tileUrl = source.sourceConfig.tiles[0]
-    const wmsXml = buildGdalWmsXml(tileUrl)
+    const tileSize = source.sourceConfig.tileSize || 256
+    const wmsXml = buildGdalWmsXml(tileUrl, tileSize)
     const bounds = getMapBounds()
-    const width = state.maxResolution
-    const height = state.maxResolution
-    return `${state.titilerEndpoint}/cog/bbox/${bounds.west},${bounds.south},${bounds.east},${bounds.north}/${width}x${height}.tif?algorithm=${source.encoding}&url=${encodeURIComponent(wmsXml)}`
+    const width = maxResolution // Use maxResolution from Jotai atom
+    const height = maxResolution // Use maxResolution from Jotai atom
+    return `${titilerEndpoint}/cog/bbox/${bounds.west},${bounds.south},${bounds.east},${bounds.north}/${width}x${height}.tif?url=${encodeURIComponent(wmsXml)}`
   }
 
   const getSourceUrl = () => {
@@ -121,23 +144,82 @@ export function TerrainControls({ state, setState, getMapBounds, mapRef }: Terra
   const takeScreenshot = async () => {
     if (!mapRef.current) return
     try {
-      const mapContainer = mapRef.current.getMap().getContainer()
-      const blob = await domToBlob(mapContainer, {
-        quality: 1,
-        backgroundColor: "#ffffff",
+      const canvas = mapRef.current.getMap().getCanvas()
+      canvas.toBlob((blob) => {
+        if (!blob) {
+          console.error("Failed to create blob from canvas")
+          return
+        }
+        const { saveAs } = require("file-saver")
+        saveAs(blob, `terrain-screenshot-${Date.now()}.png`)
       })
-      if (blob) {
-        const url = URL.createObjectURL(blob)
-        const link = document.createElement("a")
-        link.href = url
-        link.download = `terrain-screenshot-${Date.now()}.png`
-        document.body.appendChild(link)
-        link.click()
-        document.body.removeChild(link)
-        URL.revokeObjectURL(url)
-      }
     } catch (error) {
       console.error("Failed to take screenshot:", error)
+    }
+  }
+
+  const exportDTM = async () => {
+    try {
+      const url = getTitilerDownloadUrl()
+      const response = await fetch(url)
+      if (!response.ok) {
+        window.open(url, "_blank")
+        return
+      }
+
+      const arrayBuffer = await response.arrayBuffer()
+      const { fromArrayBuffer, writeArrayBuffer } = await import("geotiff")
+      const tiff = await fromArrayBuffer(arrayBuffer)
+      const image = await tiff.getImage()
+      const rasters = await image.readRasters()
+
+      const width = image.getWidth()
+      const height = image.getHeight()
+      const source = terrainSources[state.sourceA]
+      const encoding = source.encoding
+
+      const elevationData = new Float32Array(width * height)
+      const r = rasters[0]
+      const g = rasters[1]
+      const b = rasters[2]
+
+      for (let i = 0; i < width * height; i++) {
+        if (encoding === "terrainrgb") {
+          // TerrainRGB: height = -10000 + ((R * 256 * 256 + G * 256 + B) * 0.1)
+          elevationData[i] = -10000 + (r[i] * 256 * 256 + g[i] * 256 + b[i]) * 0.1
+        } else {
+          // Terrarium: height = (R * 256 + G + B / 256) - 32768
+          elevationData[i] = r[i] * 256 + g[i] + b[i] / 256 - 32768
+        }
+      }
+
+      const bounds = getMapBounds()
+      const pixelSizeX = (bounds.east - bounds.west) / width
+      const pixelSizeY = (bounds.north - bounds.south) / height
+
+      const metadata = {
+        GTModelTypeGeoKey: 2,
+        GeographicTypeGeoKey: 4326,
+        GeogCitationGeoKey: "WGS 84",
+        height: height,
+        width: width,
+        ModelPixelScale: [pixelSizeX, pixelSizeY, 0],
+        ModelTiepoint: [0, 0, 0, bounds.west, bounds.north, 0],
+        SamplesPerPixel: 1,
+        BitsPerSample: [32],
+        SampleFormat: [3], // Float
+        PlanarConfiguration: 1,
+        PhotometricInterpretation: 1,
+      }
+
+      const outputArrayBuffer = await writeArrayBuffer(elevationData, metadata)
+      const { saveAs } = await import("file-saver")
+      const blob = new Blob([outputArrayBuffer], { type: "image/tiff" })
+      saveAs(blob, `terrain-dtm-${Date.now()}.tif`)
+    } catch (error) {
+      console.error("Failed to export DTM:", error)
+      const url = getTitilerDownloadUrl()
+      window.open(url, "_blank")
     }
   }
 
@@ -183,9 +265,9 @@ export function TerrainControls({ state, setState, getMapBounds, mapRef }: Terra
                         if (!batchEditMode) {
                           // Entering batch mode - populate with current values
                           const keys = [
-                            `maptiler_api_key=${state.maptilerKey}`,
-                            `mapbox_access_token=${state.mapboxKey}`,
-                            `google_api_key=${state.googleKey}`,
+                            `maptiler_api_key=${maptilerKey}`,
+                            `mapbox_access_token=${mapboxKey}`,
+                            `google_api_key=${googleKey}`,
                           ]
                           setBatchApiKeys(keys.join("\n"))
                         } else {
@@ -195,12 +277,11 @@ export function TerrainControls({ state, setState, getMapBounds, mapRef }: Terra
                           lines.forEach((line) => {
                             const [key, value] = line.split("=")
                             if (key && value) {
-                              if (key.trim() === "maptiler_api_key") updates.maptilerKey = value.trim()
-                              if (key.trim() === "mapbox_access_token") updates.mapboxKey = value.trim()
-                              if (key.trim() === "google_api_key") updates.googleKey = value.trim()
+                              if (key.trim() === "maptiler_api_key") setMaptilerKey(value.trim())
+                              if (key.trim() === "mapbox_access_token") setMapboxKey(value.trim())
+                              if (key.trim() === "google_api_key") setGoogleKey(value.trim())
                             }
                           })
-                          setState(updates)
                         }
                         setBatchEditMode(!batchEditMode)
                       }}
@@ -228,8 +309,8 @@ export function TerrainControls({ state, setState, getMapBounds, mapRef }: Terra
                           id="maptiler-key"
                           type="text"
                           placeholder="Your MapTiler API key"
-                          value={state.maptilerKey}
-                          onChange={(e) => setState({ maptilerKey: e.target.value })}
+                          value={maptilerKey}
+                          onChange={(e) => setMaptilerKey(e.target.value)}
                           className="cursor-text"
                         />
                       </div>
@@ -239,8 +320,8 @@ export function TerrainControls({ state, setState, getMapBounds, mapRef }: Terra
                           id="mapbox-key"
                           type="text"
                           placeholder="pk.your_mapbox_token_here"
-                          value={state.mapboxKey}
-                          onChange={(e) => setState({ mapboxKey: e.target.value })}
+                          value={mapboxKey}
+                          onChange={(e) => setMapboxKey(e.target.value)}
                           className="cursor-text"
                         />
                       </div>
@@ -250,8 +331,8 @@ export function TerrainControls({ state, setState, getMapBounds, mapRef }: Terra
                           id="google-key"
                           type="text"
                           placeholder="Your Google Maps API key"
-                          value={state.googleKey}
-                          onChange={(e) => setState({ googleKey: e.target.value })}
+                          value={googleKey}
+                          onChange={(e) => setGoogleKey(e.target.value)}
                           className="cursor-text"
                         />
                       </div>
@@ -270,8 +351,8 @@ export function TerrainControls({ state, setState, getMapBounds, mapRef }: Terra
                       id="titiler-endpoint"
                       type="text"
                       placeholder="https://titiler.xyz"
-                      value={state.titilerEndpoint}
-                      onChange={(e) => setState({ titilerEndpoint: e.target.value })}
+                      value={titilerEndpoint}
+                      onChange={(e) => setTitilerEndpoint(e.target.value)}
                       className="cursor-text"
                     />
                   </div>
@@ -281,10 +362,28 @@ export function TerrainControls({ state, setState, getMapBounds, mapRef }: Terra
                       id="max-resolution"
                       type="number"
                       placeholder="4096"
-                      value={state.maxResolution}
-                      onChange={(e) => setState({ maxResolution: Number.parseFloat(e.target.value) })}
+                      value={maxResolution}
+                      onChange={(e) => setMaxResolution(Number.parseFloat(e.target.value))}
                       className="cursor-text"
                     />
+                  </div>
+                </div>
+
+                <Separator />
+
+                <div className="space-y-3">
+                  <h3 className="text-sm font-semibold">Terrain Encoding Functions</h3>
+                  <div className="space-y-2 text-sm font-mono bg-muted p-3 rounded">
+                    <div>
+                      <span className="font-semibold">TerrainRGB:</span>
+                      <br />
+                      <code>height = -10000 + ((R * 256 * 256 + G * 256 + B) * 0.1)</code>
+                    </div>
+                    <div className="mt-2">
+                      <span className="font-semibold">Terrarium:</span>
+                      <br />
+                      <code>height = (R * 256 + G + B / 256) - 32768</code>
+                    </div>
                   </div>
                 </div>
 
@@ -368,9 +467,7 @@ export function TerrainControls({ state, setState, getMapBounds, mapRef }: Terra
                       variant="outline"
                       size="sm"
                       onClick={() => {
-                        const newTheme = theme === "light" ? "dark" : "light"
-                        setTheme(newTheme)
-                        document.documentElement.classList.toggle("dark", newTheme === "dark")
+                        setTheme(theme === "light" ? "dark" : "light")
                       }}
                       className="cursor-pointer"
                     >
@@ -397,6 +494,35 @@ export function TerrainControls({ state, setState, getMapBounds, mapRef }: Terra
         </CollapsibleTrigger>
         <CollapsibleContent className="space-y-2 pt-1">
           <div className="flex items-center justify-between gap-2">
+            <Label className="text-sm font-medium">View Mode</Label>
+            <ToggleGroup
+              type="single"
+              value={state.viewMode}
+              onValueChange={(value) => value && setState({ viewMode: value })}
+              className="border rounded-md w-[140px]"
+            >
+              <ToggleGroupItem
+                value="2d"
+                className="flex-1 cursor-pointer data-[state=on]:bg-white data-[state=on]:font-bold data-[state=on]:text-foreground data-[state=off]:text-muted-foreground data-[state=off]:font-normal"
+              >
+                2D
+              </ToggleGroupItem>
+              <ToggleGroupItem
+                value="globe"
+                className="flex-1 cursor-pointer data-[state=on]:bg-white data-[state=on]:font-bold data-[state=on]:text-foreground data-[state=off]:text-muted-foreground data-[state=off]:font-normal"
+              >
+                <Globe className="h-4 w-4 text-foreground" />
+              </ToggleGroupItem>
+              <ToggleGroupItem
+                value="3d"
+                className="flex-1 cursor-pointer data-[state=on]:bg-white data-[state=on]:font-bold data-[state=on]:text-foreground data-[state=off]:text-muted-foreground data-[state=off]:font-normal"
+              >
+                3D
+              </ToggleGroupItem>
+            </ToggleGroup>
+          </div>
+
+          <div className="flex items-center justify-between gap-2">
             <Label className="text-sm font-medium">Split Screen</Label>
             <ToggleGroup
               type="single"
@@ -415,35 +541,6 @@ export function TerrainControls({ state, setState, getMapBounds, mapRef }: Terra
                 className="flex-1 cursor-pointer data-[state=on]:bg-white data-[state=on]:font-bold data-[state=on]:text-foreground data-[state=off]:text-muted-foreground data-[state=off]:font-normal"
               >
                 On
-              </ToggleGroupItem>
-            </ToggleGroup>
-          </div>
-
-          <div className="flex items-center justify-between gap-2">
-            <Label className="text-sm font-medium">View Mode</Label>
-            <ToggleGroup
-              type="single"
-              value={state.viewMode}
-              onValueChange={(value) => value && setState({ viewMode: value })}
-              className="border rounded-md w-[140px]"
-            >
-              <ToggleGroupItem
-                value="2d"
-                className="flex-1 cursor-pointer data-[state=on]:bg-white data-[state=on]:font-bold data-[state=on]:text-foreground data-[state=off]:text-muted-foreground data-[state=off]:font-normal"
-              >
-                2D
-              </ToggleGroupItem>
-              <ToggleGroupItem
-                value="globe"
-                className="flex-1 cursor-pointer data-[state=on]:bg-white data-[state=on]:font-bold data-[state=on]:text-foreground data-[state=off]:text-muted-foreground data-[state=off]:font-normal"
-              >
-                🌐
-              </ToggleGroupItem>
-              <ToggleGroupItem
-                value="3d"
-                className="flex-1 cursor-pointer data-[state=on]:bg-white data-[state=on]:font-bold data-[state=on]:text-foreground data-[state=off]:text-muted-foreground data-[state=off]:font-normal"
-              >
-                3D
               </ToggleGroupItem>
             </ToggleGroup>
           </div>
@@ -666,7 +763,8 @@ export function TerrainControls({ state, setState, getMapBounds, mapRef }: Terra
           <ChevronDown className={`h-4 w-4 transition-transform ${isVizModesOpen ? "rotate-180" : ""}`} />
         </CollapsibleTrigger>
         <CollapsibleContent className="space-y-2 pt-1">
-          <div className="flex items-center gap-2">
+          {/* Hillshade */}
+          <div className="grid grid-cols-[auto_1fr_1fr] gap-2 items-center">
             <Checkbox
               id="hillshade"
               checked={state.showHillshade}
@@ -676,8 +774,19 @@ export function TerrainControls({ state, setState, getMapBounds, mapRef }: Terra
             <Label htmlFor="hillshade" className="text-sm cursor-pointer">
               Hillshade
             </Label>
+            <Slider
+              value={[state.hillshadeOpacity]}
+              onValueChange={([value]) => setState({ hillshadeOpacity: value })}
+              min={0}
+              max={1}
+              step={0.1}
+              className="cursor-pointer"
+              disabled={!state.showHillshade}
+            />
           </div>
-          <div className="flex items-center gap-2">
+
+          {/* Hypsometric Tint */}
+          <div className="grid grid-cols-[auto_1fr_1fr] gap-2 items-center">
             <Checkbox
               id="color-relief"
               checked={state.showColorRelief}
@@ -685,21 +794,34 @@ export function TerrainControls({ state, setState, getMapBounds, mapRef }: Terra
               className="cursor-pointer"
             />
             <Label htmlFor="color-relief" className="text-sm cursor-pointer">
-              Hypsometric Tint
+              Hypso Tint
             </Label>
+            <Slider
+              value={[state.colorReliefOpacity]}
+              onValueChange={([value]) => setState({ colorReliefOpacity: value })}
+              min={0}
+              max={1}
+              step={0.1}
+              className="cursor-pointer"
+              disabled={!state.showColorRelief}
+            />
           </div>
-          <div className="flex items-center gap-2">
+
+          {/* Contour Lines */}
+          <div className="grid grid-cols-[auto_1fr_1fr] gap-2 items-center">
             <Checkbox
               id="contours"
               checked={state.showContours}
               onCheckedChange={(checked) => setState({ showContours: checked })}
               className="cursor-pointer"
             />
-            <Label htmlFor="contours" className="text-sm cursor-pointer">
+            <Label htmlFor="contours" className="text-sm cursor-pointer col-span-2">
               Contour Lines
             </Label>
           </div>
-          <div className="flex items-center gap-2">
+
+          {/* Terrain Raster */}
+          <div className="grid grid-cols-[auto_1fr_1fr] gap-2 items-center">
             <Checkbox
               id="terrain-raster"
               checked={state.showTerrain}
@@ -709,6 +831,15 @@ export function TerrainControls({ state, setState, getMapBounds, mapRef }: Terra
             <Label htmlFor="terrain-raster" className="text-sm cursor-pointer">
               Terrain Raster
             </Label>
+            <Slider
+              value={[state.terrainOpacity]}
+              onValueChange={([value]) => setState({ terrainOpacity: value })}
+              min={0}
+              max={1}
+              step={0.1}
+              className="cursor-pointer"
+              disabled={!state.showTerrain}
+            />
           </div>
         </CollapsibleContent>
       </Collapsible>
@@ -751,6 +882,7 @@ export function TerrainControls({ state, setState, getMapBounds, mapRef }: Terra
                       <SelectItem value="igor">Igor</SelectItem>
                       <SelectItem value="basic">Basic</SelectItem>
                       <SelectItem value="multidirectional">Multidirectional</SelectItem>
+                      <SelectItem value="multidir-colors">Multidir Colors</SelectItem>
                     </SelectContent>
                   </Select>
                   <div className="flex border rounded-md shrink-0">
@@ -889,21 +1021,6 @@ export function TerrainControls({ state, setState, getMapBounds, mapRef }: Terra
               <ChevronDown className={`h-4 w-4 transition-transform ${isHypsoOpen ? "rotate-180" : ""}`} />
             </CollapsibleTrigger>
             <CollapsibleContent className="space-y-2 pt-1">
-              <div className="space-y-1">
-                <div className="flex items-center justify-between">
-                  <Label className="text-sm">Opacity</Label>
-                  <span className="text-sm text-muted-foreground">{Math.round(state.colorReliefOpacity * 100)}%</span>
-                </div>
-                <Slider
-                  value={[state.colorReliefOpacity]}
-                  onValueChange={([value]) => setState({ colorReliefOpacity: value })}
-                  min={0}
-                  max={1}
-                  step={0.1}
-                  className="cursor-pointer"
-                />
-              </div>
-
               <div className="space-y-2">
                 <Label className="text-sm font-medium">Color Ramp</Label>
                 <div className="flex gap-2">
@@ -947,14 +1064,16 @@ export function TerrainControls({ state, setState, getMapBounds, mapRef }: Terra
                   </div>
                 </div>
               </div>
+
               <div className="flex items-center gap-2">
                 <Checkbox
                   id="advanced-ramps"
                   checked={showAdvancedRamps}
                   onCheckedChange={(checked) => setShowAdvancedRamps(!!checked)}
                   className="cursor-pointer"
+                  disabled
                 />
-                <Label htmlFor="advanced-ramps" className="text-sm cursor-pointer">
+                <Label htmlFor="advanced-ramps" className="text-sm cursor-pointer text-muted-foreground">
                   Load advanced color ramps (cpt2js)
                 </Label>
               </div>
@@ -1076,38 +1195,57 @@ export function TerrainControls({ state, setState, getMapBounds, mapRef }: Terra
         </CollapsibleTrigger>
         <CollapsibleContent className="space-y-2 pt-1">
           <div className="flex gap-2">
-            <Button
-              variant="outline"
-              className="flex-[2] bg-transparent cursor-pointer"
-              onClick={() => {
-                const url = getTitilerDownloadUrl()
-                const link = document.createElement("a")
-                link.href = url
-                link.download = `terrain-${Date.now()}.tif`
-                document.body.appendChild(link)
-                link.click()
-                document.body.removeChild(link)
-              }}
-            >
-              <Download className="h-4 w-4 mr-2" />
-              GeoTIFF
-            </Button>
-            <Button variant="outline" className="flex-1 bg-transparent cursor-pointer" onClick={takeScreenshot}>
-              <Camera className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="outline"
-              className="flex-1 bg-transparent cursor-pointer"
-              onClick={() => {
-                const url = getSourceUrl()
-                copyToClipboard(url)
-              }}
-            >
-              <Copy className="h-4 w-4" />
-            </Button>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="outline" className="flex-[2] bg-transparent cursor-pointer" onClick={exportDTM}>
+                    <Download className="h-4 w-4 mr-2" />
+                    Export DTM
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p className="text-xs">Export DTM altitude GeoTIFF raw Float32 elevation values</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="outline" className="flex-1 bg-transparent cursor-pointer" onClick={takeScreenshot}>
+                    <Camera className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p className="text-xs">Export composited view</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className="flex-1 bg-transparent cursor-pointer"
+                    onClick={() => {
+                      const url = getSourceUrl()
+                      copyToClipboard(url)
+                    }}
+                  >
+                    <Copy className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p className="text-xs">
+                    Copy TMS/XYZ tileset source URL, uses {terrainSources[state.sourceA].encoding} encoding
+                  </p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           </div>
           <p className="text-xs text-muted-foreground">
-            Download terrain as GeoTIFF via Titiler, take screenshot, or copy source URL for QGIS
+            Export terrain as GeoTIFF via Titiler, take screenshot, or copy source URL for QGIS
           </p>
         </CollapsibleContent>
       </Collapsible>
