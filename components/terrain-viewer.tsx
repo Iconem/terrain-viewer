@@ -11,7 +11,8 @@ import { colorRamps } from "@/lib/color-ramps"
 import type { TerrainSource, TerrainSourceConfig } from "@/lib/terrain-types"
 import mlcontour from "maplibre-contour"
 import { useAtom } from "jotai"
-import { mapboxKeyAtom, maptilerKeyAtom } from "@/lib/settings-atoms"
+import { mapboxKeyAtom, maptilerKeyAtom } from "../lib/settings-atoms"
+import { ColorReliefLayerSpecification, LayerSpecification } from "maplibre-gl"
 
 // Memoized Sources Component - loads once per source change
 const TerrainSources = memo(({
@@ -145,40 +146,50 @@ const ColorReliefLayer = memo(({
 })
 ColorReliefLayer.displayName = "ColorReliefLayer"
 
+
 // Memoized Contour Layers
+const contourLinesLayerDef = (showContours: boolean): LayerSpecification => ({
+  id: "contour-lines",
+  type: "line",
+  source: "contour-source",
+  "source-layer": "contours",
+  paint: {
+    "line-color": "rgba(0,0,0, 50%)",
+    "line-width": ["match", ["get", "level"], 1, 1, 0.5],
+  },
+  layout: {
+    visibility: showContours ? "visible" : "none",
+  }
+})
+
+const contourLabelsLayerDef = (showContours: boolean): LayerSpecification => ({
+  id: "contour-labels",
+  type: "symbol",
+  source: "contour-source",
+  "source-layer": "contours",
+  filter: [">", ["get", "level"], 0],
+  paint: {
+    "text-halo-color": "white",
+    "text-halo-width": 1,
+  },
+  layout: {
+    "symbol-placement": "line",
+    "text-size": 10,
+    "text-field": ["concat", ["number-format", ["get", "ele"], {}], "m"],
+    "text-font": ["Noto Sans Bold"],
+    visibility: showContours ? "visible" : "none",
+  }
+
+})
+
 const ContourLayers = memo(({ showContours }: { showContours: boolean }) => {
   return (
     <>
       <Layer
-        id="contour-lines"
-        type="line"
-        source="contour-source"
-        source-layer="contours"
-        paint={{
-          "line-color": "rgba(0,0,0, 50%)",
-          "line-width": ["match", ["get", "level"], 1, 1, 0.5],
-        }}
-        layout={{
-          visibility: showContours ? "visible" : "none",
-        }}
+        {...contourLinesLayerDef(showContours)}
       />
       <Layer
-        id="contour-labels"
-        type="symbol"
-        source="contour-source"
-        source-layer="contours"
-        filter={[">", ["get", "level"], 0]}
-        layout={{
-          "symbol-placement": "line",
-          "text-size": 10,
-          "text-field": ["concat", ["number-format", ["get", "ele"], {}], "m"],
-          "text-font": ["Noto Sans Bold"],
-          visibility: showContours ? "visible" : "none",
-        }}
-        paint={{
-          "text-halo-color": "white",
-          "text-halo-width": 1,
-        }}
+        {...contourLabelsLayerDef(showContours)}
       />
     </>
   )
@@ -453,6 +464,70 @@ export function TerrainViewer() {
     }
   }, [contoursInitialized, mapLibreReady, mapsLoaded, state.sourceA, state.contourMinor, state.contourMajor, mapboxKey, maptilerKey])
 
+
+  useEffect(() => {
+    const map = mapARef.current?.getMap();
+    if (!map) return;
+
+    // Less dirty, just edit the source tiles with new contours thresholds
+    // const source = map.getSource("contour-source");
+    // const newTiles = [
+    //   demSourceRef.current.contourProtocolUrl({
+    //     multiplier: 1,
+    //     thresholds: {
+    //       11: [state.contourMajor, state.contourMajor * 5],
+    //       12: [state.contourMinor, state.contourMajor],
+    //       14: [state.contourMinor / 2, state.contourMajor],
+    //       15: [state.contourMinor / 5, state.contourMinor],
+    //     },
+    //     contourLayer: "contours",
+    //     elevationKey: "ele",
+    //     levelKey: "level",
+    //     extent: 4096,
+    //     buffer: 1,
+    //   }),
+    // ];
+    // if (source) {
+    //   source.tiles = newTiles;
+    //   // Force reload
+    //   map.triggerRepaint();
+    // }
+
+    // More dirty, remove layer, then source, then re-add, but will update state properly
+    if (map.getLayer("contour-labels")) {
+      map.removeLayer("contour-labels"); // remove any layers using it
+    }
+    if (map.getLayer("contour-lines")) {
+      map.removeLayer("contour-lines"); // remove any layers using it
+    }
+    if (map.getSource("contour-source")) {
+      map.removeSource("contour-source");
+    }
+    map.addSource("contour-source", {
+      type: "vector",
+      tiles: [
+        demSourceRef.current.contourProtocolUrl({
+          multiplier: 1,
+          thresholds: {
+            11: [state.contourMajor, state.contourMajor * 5],
+            12: [state.contourMinor, state.contourMajor],
+            14: [state.contourMinor / 2, state.contourMajor],
+            15: [state.contourMinor / 5, state.contourMinor],
+          },
+          contourLayer: "contours",
+          elevationKey: "ele",
+          levelKey: "level",
+          extent: 4096,
+          buffer: 1,
+        }),
+      ],
+      maxzoom: 15,
+    });
+    map.addLayer(contourLinesLayerDef(state.showContours));
+    map.addLayer(contourLabelsLayerDef(state.showContours));
+
+  }, [state.contourMinor, state.contourMajor])
+
   // Sync maps in split screen
   const onMoveA = useCallback(
     (evt: any) => {
@@ -555,6 +630,7 @@ export function TerrainViewer() {
           'horizon-fog-blend': 0.9,
           'fog-ground-blend': 0.5
         }}
+        minPitch={0}
         maxPitch={state.viewMode === "2d" ? 0 : 85}
         rollEnabled={state.viewMode !== "2d"}
         pitchWithRotate={state.viewMode !== "2d"}

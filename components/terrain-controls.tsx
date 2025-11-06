@@ -74,6 +74,8 @@ interface TerrainControlsProps {
   mapRef: React.RefObject<MapRef>
 }
 
+const templateLink = (link: string, lat: string, lng: string): string => link.replace('{LAT}', lat).replace('{LNG}', lng)
+
 export function TerrainControls({ state, setState, getMapBounds, mapRef }: TerrainControlsProps) {
 
   const [isColorsOpen, setIsColorsOpen] = useState(false)
@@ -327,6 +329,16 @@ export function TerrainControls({ state, setState, getMapBounds, mapRef }: Terra
       </Button>
     )
   }
+
+  // const linkTemplated:string = useEffect(
+  //   () => templateLink(link, state.lat, state.lng),
+  //   [state.lat, state.lng]
+  // )
+
+  const linkCallback = useCallback(
+    (link: string) => () => window.open(templateLink(link, state.lat, state.lng), "_blank"),
+    [state.lat, state.lng]
+  )
 
   return (
     <Card className="absolute right-4 top-4 bottom-4 w-96 overflow-y-auto p-4 gap-2 space-y-2 bg-background/95 backdrop-blur text-base">
@@ -728,12 +740,12 @@ export function TerrainControls({ state, setState, getMapBounds, mapRef }: Terra
                                 <span className="font-semibold">Link:</span>
                                 <div className="flex items-center gap-2 mt-1">
                                   <a
-                                    href={config.link}
+                                    href={config.link.split('#')[0]}
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     className="text-blue-600 hover:underline flex-1 truncate"
                                   >
-                                    {config.link}
+                                    {config.link.split('#')[0]}
                                   </a>
                                 </div>
                               </div>
@@ -772,7 +784,7 @@ export function TerrainControls({ state, setState, getMapBounds, mapRef }: Terra
                     variant="ghost"
                     size="icon"
                     className="h-8 w-8 shrink-0 cursor-pointer"
-                    onClick={() => window.open(config.link, "_blank")}
+                    onClick={linkCallback(config.link)}
                   >
                     <ExternalLink className="h-4 w-4" />
                   </Button>
@@ -812,12 +824,12 @@ export function TerrainControls({ state, setState, getMapBounds, mapRef }: Terra
                                 <span className="font-semibold">Link:</span>
                                 <div className="flex items-center gap-2 mt-1">
                                   <a
-                                    href={config.link}
+                                    href={config.link.split('#')[0]}
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     className="text-blue-600 hover:underline flex-1 truncate"
                                   >
-                                    {config.link}
+                                    {config.link.split('#')[0]}
                                   </a>
                                 </div>
                               </div>
@@ -856,7 +868,7 @@ export function TerrainControls({ state, setState, getMapBounds, mapRef }: Terra
                     variant="ghost"
                     size="icon"
                     className="h-8 w-8 shrink-0 cursor-pointer"
-                    onClick={() => window.open(config.link, "_blank")}
+                    onClick={linkCallback(config.link)}
                   >
                     <ExternalLink className="h-4 w-4" />
                   </Button>
@@ -1039,320 +1051,328 @@ export function TerrainControls({ state, setState, getMapBounds, mapRef }: Terra
 
       <Separator />
 
-      {state.showHillshade && (
-        <>
-          <Collapsible open={isHillshadeOpen} onOpenChange={setIsHillshadeOpen}>
-            <CollapsibleTrigger className="flex items-center justify-between w-full py-1 text-base font-medium cursor-pointer">
-              Hillshade Options
-              <ChevronDown className={`h-4 w-4 transition-transform ${isHillshadeOpen ? "rotate-180" : ""}`} />
-            </CollapsibleTrigger>
-            <CollapsibleContent className="space-y-2 pt-1">
-              <div className="space-y-2">
-                <Label className="text-sm font-medium">Hillshade Method</Label>
-                <div className="flex gap-2">
-                  <Select value={state.hillshadeMethod} onValueChange={(value) => setState({ hillshadeMethod: value })}>
-                    <SelectTrigger className="flex-1 cursor-pointer">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="combined">Combined</SelectItem>
-                      <SelectItem value="standard">Standard</SelectItem>
-                      <SelectItem value="multidir-colors">Aspect (Multidir Colors)</SelectItem>
-                      <SelectItem value="igor">Igor</SelectItem>
-                      <SelectItem value="basic">Basic</SelectItem>
-                      <SelectItem value="multidirectional">Multidirectional</SelectItem>
-                      <SelectItem value="aspect-multidir">Aspect classic (Multidir Colors)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <div className="flex border rounded-md shrink-0">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => cycleHillshadeMethod(-1)}
-                      className="rounded-r-none border-r cursor-pointer"
-                    >
-                      <ChevronLeft className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => cycleHillshadeMethod(1)}
-                      className="rounded-l-none cursor-pointer"
-                    >
-                      <ChevronRight className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-              </div>
-
-              {supportsIlluminationDirection && (
-                <div className="space-y-1">
-                  <div className="flex items-center justify-between">
-                    <Label className="text-sm">Illumination Direction</Label>
-                    <span className="text-sm text-muted-foreground">{state.illuminationDir}°</span>
-                  </div>
-                  <Slider
-                    value={[state.illuminationDir]}
-                    onValueChange={([value]) => setState({ illuminationDir: value })}
-                    min={0}
-                    max={360}
-                    step={1}
-                    className="cursor-pointer"
-                  />
-                </div>
-              )}
-
-              {supportsIlluminationAltitude && (
-                <div className="space-y-1">
-                  <div className="flex items-center justify-between">
-                    <Label className="text-sm">Illumination Altitude</Label>
-                    <span className="text-sm text-muted-foreground">{state.illuminationAlt}°</span>
-                  </div>
-                  <Slider
-                    value={[state.illuminationAlt]}
-                    onValueChange={([value]) => setState({ illuminationAlt: value })}
-                    min={0}
-                    max={90}
-                    step={1}
-                    className="cursor-pointer"
-                  />
-                </div>
-              )}
-
-              {supportsExaggeration && (
-                <div className="space-y-1">
-                  <div className="flex items-center justify-between">
-                    <Label className="text-sm">Hillshade Exaggeration</Label>
-                    <span className="text-sm text-muted-foreground">{state.hillshadeExag.toFixed(1)}</span>
-                  </div>
-                  <Slider
-                    value={[state.hillshadeExag]}
-                    onValueChange={([value]) => setState({ hillshadeExag: value })}
-                    min={0}
-                    max={1}
-                    step={0.1}
-                    className="cursor-pointer"
-                  />
-                </div>
-              )}
-
-              {(supportsShadowColor || supportsHighlightColor || supportsAccentColor) && (
-                <Collapsible open={isColorsOpen} onOpenChange={setIsColorsOpen}>
-                  <CollapsibleTrigger className="flex items-center justify-between w-full py-0.5 text-sm font-medium cursor-pointer">
-                    Hillshade Colors
-                    <ChevronDown className={`h-4 w-4 transition-transform ${isColorsOpen ? "rotate-180" : ""}`} />
-                  </CollapsibleTrigger>
-                  <CollapsibleContent className="space-y-1 pt-1">
-                    <div
-                      className="grid gap-2"
-                      style={{
-                        gridTemplateColumns: supportsAccentColor ? "repeat(3, 1fr)" : "repeat(2, 1fr)",
-                      }}
-                    >
-                      {supportsShadowColor && (
-                        <div className="space-y-1">
-                          <Label className="text-xs">Shadow</Label>
-                          <Input
-                            type="color"
-                            value={state.shadowColor}
-                            onChange={(e) => setState({ shadowColor: e.target.value })}
-                            className="h-9 p-1 cursor-pointer border-none"
-                          />
-                        </div>
-                      )}
-                      {supportsHighlightColor && (
-                        <div className="space-y-1">
-                          <Label className="text-xs">Highlight</Label>
-                          <Input
-                            type="color"
-                            value={state.highlightColor}
-                            onChange={(e) => setState({ highlightColor: e.target.value })}
-                            className="h-9 p-1 cursor-pointer border-none"
-                          />
-                        </div>
-                      )}
-                      {supportsAccentColor && (
-                        <div className="space-y-1">
-                          <Label className="text-xs">Accent</Label>
-                          <Input
-                            type="color"
-                            value={state.accentColor}
-                            onChange={(e) => setState({ accentColor: e.target.value })}
-                            className="h-9 p-1 cursor-pointer border-none"
-                          />
-                        </div>
-                      )}
+      {
+        state.showHillshade && (
+          <>
+            <Collapsible open={isHillshadeOpen} onOpenChange={setIsHillshadeOpen}>
+              <CollapsibleTrigger className="flex items-center justify-between w-full py-1 text-base font-medium cursor-pointer">
+                Hillshade Options
+                <ChevronDown className={`h-4 w-4 transition-transform ${isHillshadeOpen ? "rotate-180" : ""}`} />
+              </CollapsibleTrigger>
+              <CollapsibleContent className="space-y-2 pt-1">
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">Hillshade Method</Label>
+                  <div className="flex gap-2">
+                    <Select value={state.hillshadeMethod} onValueChange={(value) => setState({ hillshadeMethod: value })}>
+                      <SelectTrigger className="flex-1 cursor-pointer">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="combined">Combined</SelectItem>
+                        <SelectItem value="standard">Standard</SelectItem>
+                        <SelectItem value="multidir-colors">Aspect (Multidir Colors)</SelectItem>
+                        <SelectItem value="igor">Igor</SelectItem>
+                        <SelectItem value="basic">Basic</SelectItem>
+                        <SelectItem value="multidirectional">Multidirectional</SelectItem>
+                        <SelectItem value="aspect-multidir">Aspect classic (Multidir Colors)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <div className="flex border rounded-md shrink-0">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => cycleHillshadeMethod(-1)}
+                        className="rounded-r-none border-r cursor-pointer"
+                      >
+                        <ChevronLeft className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => cycleHillshadeMethod(1)}
+                        className="rounded-l-none cursor-pointer"
+                      >
+                        <ChevronRight className="h-4 w-4" />
+                      </Button>
                     </div>
-                  </CollapsibleContent>
-                </Collapsible>
-              )}
-            </CollapsibleContent>
-          </Collapsible>
-          <Separator />
-        </>
-      )}
+                  </div>
+                </div>
 
-      {state.showColorRelief && (
-        <>
-          <Collapsible open={isHypsoOpen} onOpenChange={setIsHypsoOpen}>
-            <CollapsibleTrigger className="flex items-center justify-between w-full py-1 text-base font-medium cursor-pointer">
-              Hypsometric Tint Options
-              <ChevronDown className={`h-4 w-4 transition-transform ${isHypsoOpen ? "rotate-180" : ""}`} />
-            </CollapsibleTrigger>
-            <CollapsibleContent className="space-y-2 pt-1">
-              <div className="space-y-2">
-                <Label className="text-sm font-medium">Color Ramp</Label>
-                <div className="flex gap-2">
-                  <Select value={state.colorRamp} onValueChange={(value) => setState({ colorRamp: value })}>
-                    <SelectTrigger className="flex-1 cursor-pointer">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {Object.entries(colorRamps).map(([key, ramp]) => (
-                        <SelectItem key={key} value={key}>
-                          <div className="flex items-center gap-2">
-                            <div
-                              className="w-12 h-4 rounded-sm"
-                              style={{
-                                background: `linear-gradient(to right, ${getGradientColors(ramp.colors)})`,
-                              }}
+                {supportsIlluminationDirection && (
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-sm">Illumination Direction</Label>
+                      <span className="text-sm text-muted-foreground">{state.illuminationDir}°</span>
+                    </div>
+                    <Slider
+                      value={[state.illuminationDir]}
+                      onValueChange={([value]) => setState({ illuminationDir: value })}
+                      min={0}
+                      max={360}
+                      step={1}
+                      className="cursor-pointer"
+                    />
+                  </div>
+                )}
+
+                {supportsIlluminationAltitude && (
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-sm">Illumination Altitude</Label>
+                      <span className="text-sm text-muted-foreground">{state.illuminationAlt}°</span>
+                    </div>
+                    <Slider
+                      value={[state.illuminationAlt]}
+                      onValueChange={([value]) => setState({ illuminationAlt: value })}
+                      min={0}
+                      max={90}
+                      step={1}
+                      className="cursor-pointer"
+                    />
+                  </div>
+                )}
+
+                {supportsExaggeration && (
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-sm">Hillshade Exaggeration</Label>
+                      <span className="text-sm text-muted-foreground">{state.hillshadeExag.toFixed(1)}</span>
+                    </div>
+                    <Slider
+                      value={[state.hillshadeExag]}
+                      onValueChange={([value]) => setState({ hillshadeExag: value })}
+                      min={0}
+                      max={1}
+                      step={0.1}
+                      className="cursor-pointer"
+                    />
+                  </div>
+                )}
+
+                {(supportsShadowColor || supportsHighlightColor || supportsAccentColor) && (
+                  <Collapsible open={isColorsOpen} onOpenChange={setIsColorsOpen}>
+                    <CollapsibleTrigger className="flex items-center justify-between w-full py-0.5 text-sm font-medium cursor-pointer">
+                      Hillshade Colors
+                      <ChevronDown className={`h-4 w-4 transition-transform ${isColorsOpen ? "rotate-180" : ""}`} />
+                    </CollapsibleTrigger>
+                    <CollapsibleContent className="space-y-1 pt-1">
+                      <div
+                        className="grid gap-2"
+                        style={{
+                          gridTemplateColumns: supportsAccentColor ? "repeat(3, 1fr)" : "repeat(2, 1fr)",
+                        }}
+                      >
+                        {supportsShadowColor && (
+                          <div className="space-y-1">
+                            <Label className="text-xs">Shadow</Label>
+                            <Input
+                              type="color"
+                              value={state.shadowColor}
+                              onChange={(e) => setState({ shadowColor: e.target.value })}
+                              className="h-9 p-1 cursor-pointer border-none"
                             />
-                            <span>{ramp.name}</span>
                           </div>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <div className="flex border rounded-md shrink-0">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => cycleColorRamp(-1)}
-                      className="rounded-r-none border-r cursor-pointer"
-                    >
-                      <ChevronLeft className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => cycleColorRamp(1)}
-                      className="rounded-l-none cursor-pointer"
-                    >
-                      <ChevronRight className="h-4 w-4" />
-                    </Button>
+                        )}
+                        {supportsHighlightColor && (
+                          <div className="space-y-1">
+                            <Label className="text-xs">Highlight</Label>
+                            <Input
+                              type="color"
+                              value={state.highlightColor}
+                              onChange={(e) => setState({ highlightColor: e.target.value })}
+                              className="h-9 p-1 cursor-pointer border-none"
+                            />
+                          </div>
+                        )}
+                        {supportsAccentColor && (
+                          <div className="space-y-1">
+                            <Label className="text-xs">Accent</Label>
+                            <Input
+                              type="color"
+                              value={state.accentColor}
+                              onChange={(e) => setState({ accentColor: e.target.value })}
+                              className="h-9 p-1 cursor-pointer border-none"
+                            />
+                          </div>
+                        )}
+                      </div>
+                    </CollapsibleContent>
+                  </Collapsible>
+                )}
+              </CollapsibleContent>
+            </Collapsible>
+            <Separator />
+          </>
+        )
+      }
+
+      {
+        state.showColorRelief && (
+          <>
+            <Collapsible open={isHypsoOpen} onOpenChange={setIsHypsoOpen}>
+              <CollapsibleTrigger className="flex items-center justify-between w-full py-1 text-base font-medium cursor-pointer">
+                Hypsometric Tint Options
+                <ChevronDown className={`h-4 w-4 transition-transform ${isHypsoOpen ? "rotate-180" : ""}`} />
+              </CollapsibleTrigger>
+              <CollapsibleContent className="space-y-2 pt-1">
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">Color Ramp</Label>
+                  <div className="flex gap-2">
+                    <Select value={state.colorRamp} onValueChange={(value) => setState({ colorRamp: value })}>
+                      <SelectTrigger className="flex-1 cursor-pointer">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {Object.entries(colorRamps).map(([key, ramp]) => (
+                          <SelectItem key={key} value={key}>
+                            <div className="flex items-center gap-2">
+                              <div
+                                className="w-12 h-4 rounded-sm"
+                                style={{
+                                  background: `linear-gradient(to right, ${getGradientColors(ramp.colors)})`,
+                                }}
+                              />
+                              <span>{ramp.name}</span>
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <div className="flex border rounded-md shrink-0">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => cycleColorRamp(-1)}
+                        className="rounded-r-none border-r cursor-pointer"
+                      >
+                        <ChevronLeft className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => cycleColorRamp(1)}
+                        className="rounded-l-none cursor-pointer"
+                      >
+                        <ChevronRight className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              <div className="flex items-center gap-2">
-                <Checkbox
-                  id="advanced-ramps"
-                  checked={showAdvancedRamps}
-                  onCheckedChange={(checked) => setShowAdvancedRamps(!!checked)}
-                  className="cursor-pointer"
-                  disabled
-                />
-                <Label htmlFor="advanced-ramps" className="text-sm cursor-pointer text-muted-foreground">
-                  Load advanced color ramps (cpt2js)
-                </Label>
-              </div>
-            </CollapsibleContent>
-          </Collapsible>
-          <Separator />
-        </>
-      )}
+                <div className="flex items-center gap-2">
+                  <Checkbox
+                    id="advanced-ramps"
+                    checked={showAdvancedRamps}
+                    onCheckedChange={(checked) => setShowAdvancedRamps(!!checked)}
+                    className="cursor-pointer"
+                    disabled
+                  />
+                  <Label htmlFor="advanced-ramps" className="text-sm cursor-pointer text-muted-foreground">
+                    Load advanced color ramps (cpt2js)
+                  </Label>
+                </div>
+              </CollapsibleContent>
+            </Collapsible>
+            <Separator />
+          </>
+        )
+      }
 
-      {state.showRasterBasemap && (
-        <>
-          <Collapsible open={isTerrainRasterOpen} onOpenChange={setIsTerrainRasterOpen}>
-            <CollapsibleTrigger className="flex items-center justify-between w-full py-1 text-base font-medium cursor-pointer">
-              Raster Basemap Options
-              <ChevronDown className={`h-4 w-4 transition-transform ${isTerrainRasterOpen ? "rotate-180" : ""}`} />
-            </CollapsibleTrigger>
-            <CollapsibleContent className="space-y-2 pt-1">
-              <div className="space-y-2">
-                <Label className="text-sm">Source</Label>
-                <div className="flex gap-2">
-                  <Select value={state.terrainSource} onValueChange={(value) => setState({ terrainSource: value })}>
-                    <SelectTrigger className="flex-1 cursor-pointer">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="google">Google Hybrid</SelectItem>
-                      <SelectItem value="mapbox">Mapbox Satellite</SelectItem>
-                      <SelectItem value="esri">ESRI World Imagery</SelectItem>
-                      <SelectItem value="googlesat">Google Satellite</SelectItem>
-                      <SelectItem value="bing">Bing Aerial</SelectItem>
-                      <SelectItem value="osm">OpenStreetMap</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <div className="flex border rounded-md shrink-0">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => cycleTerrainSource(-1)}
-                      className="rounded-r-none border-r cursor-pointer"
-                    >
-                      <ChevronLeft className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => cycleTerrainSource(1)}
-                      className="rounded-l-none cursor-pointer"
-                    >
-                      <ChevronRight className="h-4 w-4" />
-                    </Button>
+      {
+        state.showRasterBasemap && (
+          <>
+            <Collapsible open={isTerrainRasterOpen} onOpenChange={setIsTerrainRasterOpen}>
+              <CollapsibleTrigger className="flex items-center justify-between w-full py-1 text-base font-medium cursor-pointer">
+                Raster Basemap Options
+                <ChevronDown className={`h-4 w-4 transition-transform ${isTerrainRasterOpen ? "rotate-180" : ""}`} />
+              </CollapsibleTrigger>
+              <CollapsibleContent className="space-y-2 pt-1">
+                <div className="space-y-2">
+                  <Label className="text-sm">Source</Label>
+                  <div className="flex gap-2">
+                    <Select value={state.terrainSource} onValueChange={(value) => setState({ terrainSource: value })}>
+                      <SelectTrigger className="flex-1 cursor-pointer">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="google">Google Hybrid</SelectItem>
+                        <SelectItem value="mapbox">Mapbox Satellite</SelectItem>
+                        <SelectItem value="esri">ESRI World Imagery</SelectItem>
+                        <SelectItem value="googlesat">Google Satellite</SelectItem>
+                        <SelectItem value="bing">Bing Aerial</SelectItem>
+                        <SelectItem value="osm">OpenStreetMap</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <div className="flex border rounded-md shrink-0">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => cycleTerrainSource(-1)}
+                        className="rounded-r-none border-r cursor-pointer"
+                      >
+                        <ChevronLeft className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => cycleTerrainSource(1)}
+                        className="rounded-l-none cursor-pointer"
+                      >
+                        <ChevronRight className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </div>
                 </div>
-              </div>
-            </CollapsibleContent>
-          </Collapsible>
-          <Separator />
-        </>
-      )}
+              </CollapsibleContent>
+            </Collapsible>
+            <Separator />
+          </>
+        )
+      }
 
-      {state.showContours && (
-        <>
-          <Collapsible open={isContoursOpen} onOpenChange={setIsContoursOpen}>
-            <CollapsibleTrigger className="flex items-center justify-between w-full py-1 text-base font-medium cursor-pointer">
-              Contour Options
-              <ChevronDown className={`h-4 w-4 transition-transform ${isContoursOpen ? "rotate-180" : ""}`} />
-            </CollapsibleTrigger>
-            <CollapsibleContent className="space-y-2 pt-1">
-              <div className="space-y-1">
-                <div className="flex items-center justify-between">
-                  <Label className="text-sm">Minor Interval (m)</Label>
-                  <span className="text-sm text-muted-foreground">{state.contourMinor}m</span>
+      {
+        state.showContours && (
+          <>
+            <Collapsible open={isContoursOpen} onOpenChange={setIsContoursOpen}>
+              <CollapsibleTrigger className="flex items-center justify-between w-full py-1 text-base font-medium cursor-pointer">
+                Contour Options
+                <ChevronDown className={`h-4 w-4 transition-transform ${isContoursOpen ? "rotate-180" : ""}`} />
+              </CollapsibleTrigger>
+              <CollapsibleContent className="space-y-2 pt-1">
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-sm">Minor Interval (m)</Label>
+                    <span className="text-sm text-muted-foreground">{state.contourMinor}m</span>
+                  </div>
+                  <Slider
+                    value={[state.contourMinor]}
+                    onValueChange={([value]) => setState({ contourMinor: value })}
+                    min={10}
+                    max={100}
+                    step={10}
+                    className="cursor-pointer"
+                  />
                 </div>
-                <Slider
-                  value={[state.contourMinor]}
-                  onValueChange={([value]) => setState({ contourMinor: value })}
-                  min={10}
-                  max={100}
-                  step={10}
-                  className="cursor-pointer"
-                />
-              </div>
-              <div className="space-y-1">
-                <div className="flex items-center justify-between">
-                  <Label className="text-sm">Major Interval (m)</Label>
-                  <span className="text-sm text-muted-foreground">{state.contourMajor}m</span>
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-sm">Major Interval (m)</Label>
+                    <span className="text-sm text-muted-foreground">{state.contourMajor}m</span>
+                  </div>
+                  <Slider
+                    value={[state.contourMajor]}
+                    onValueChange={([value]) => setState({ contourMajor: value })}
+                    min={50}
+                    max={500}
+                    step={50}
+                    className="cursor-pointer"
+                  />
                 </div>
-                <Slider
-                  value={[state.contourMajor]}
-                  onValueChange={([value]) => setState({ contourMajor: value })}
-                  min={50}
-                  max={500}
-                  step={50}
-                  className="cursor-pointer"
-                />
-              </div>
-            </CollapsibleContent>
-          </Collapsible>
-          <Separator />
-        </>
-      )}
+              </CollapsibleContent>
+            </Collapsible>
+            <Separator />
+          </>
+        )
+      }
 
       <div className="text-xs text-muted-foreground space-y-1">
         <p>Inspired by:</p>
@@ -1381,7 +1401,7 @@ export function TerrainControls({ state, setState, getMapBounds, mapRef }: Terra
           </li>
         </ul>
       </div>
-    </Card>
+    </Card >
   )
 }
 
