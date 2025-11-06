@@ -16,3 +16,14 @@ export const isTerrainRasterOpenAtom = atomWithStorage("isTerrainRasterOpen", tr
 export const isHypsoOpenAtom = atomWithStorage("isHypsoOpen", true)
 export const isContoursOpenAtom = atomWithStorage("isContoursOpen", true)
 export const isDownloadOpenAtom = atomWithStorage("isDownloadOpen", true)
+
+export interface CustomTerrainSource {
+  id: string
+  name: string
+  url: string
+  type: "cog" | "terrainrgb" | "terrarium"
+  description?: string
+}
+
+export const customTerrainSourcesAtom = atomWithStorage<CustomTerrainSource[]>("customTerrainSources", [])
+export const isByodOpenAtom = atomWithStorage("isByodOpen", true)

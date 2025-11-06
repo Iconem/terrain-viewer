@@ -20,6 +20,9 @@ import {
   RotateCcw,
   Settings,
   Sun,
+  Plus,
+  Edit,
+  Trash2,
 } from "lucide-react"
 import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -38,9 +41,10 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogTrigger, DialogClose
+  DialogTrigger,
+  DialogClose
 } from "@/components/ui/dialog"
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { terrainSources } from "@/lib/terrain-sources"
 import { colorRamps } from "@/lib/color-ramps"
 import { buildGdalWmsXml } from "@/lib/build-gdal-xml"
@@ -59,10 +63,13 @@ import {
   isHypsoOpenAtom,
   isContoursOpenAtom,
   isDownloadOpenAtom,
+  customTerrainSourcesAtom,
+  isByodOpenAtom,
+  type CustomTerrainSource,
 } from "@/lib/settings-atoms"
 import type { MapRef } from "react-map-gl/maplibre"
 
-import { domToPng, domToPixel } from "modern-screenshot"
+import { domToPng } from "modern-screenshot"
 import { fromArrayBuffer, writeArrayBuffer } from "geotiff"
 import saveAs from "file-saver"
 import type { TerrainSource, TerrainSourceConfig } from "@/lib/terrain-types"
@@ -74,7 +81,8 @@ interface TerrainControlsProps {
   mapRef: React.RefObject<MapRef>
 }
 
-const templateLink = (link: string, lat: string, lng: string): string => link.replace('{LAT}', lat).replace('{LNG}', lng)
+const templateLink = (link: string, lat: string, lng: string): string =>
+  link.replace("{LAT}", lat).replace("{LNG}", lng)
 
 export function TerrainControls({ state, setState, getMapBounds, mapRef }: TerrainControlsProps) {
 
@@ -98,20 +106,63 @@ export function TerrainControls({ state, setState, getMapBounds, mapRef }: Terra
   const [googleKey, setGoogleKey] = useAtom(googleKeyAtom)
   const [maptilerKey, setMaptilerKey] = useAtom(maptilerKeyAtom)
 
+  const [customTerrainSources, setCustomTerrainSources] = useAtom(customTerrainSourcesAtom)
+  const [isByodOpen, setIsByodOpen] = useAtom(isByodOpenAtom)
+  const [isAddSourceModalOpen, setIsAddSourceModalOpen] = useState(false)
+  const [editingSource, setEditingSource] = useState<CustomTerrainSource | null>(null)
+  const [newSourceName, setNewSourceName] = useState("")
+  const [newSourceUrl, setNewSourceUrl] = useState("")
+  const [newSourceType, setNewSourceType] = useState<"cog" | "terrainrgb" | "terrarium">("cog")
+  const [newSourceDescription, setNewSourceDescription] = useState("")
+
   const getTilesUrl = useCallback(
-    function (key: TerrainSource) {
+    (key: TerrainSource) => {
       const source: TerrainSourceConfig = terrainSources[key]
       let tileUrl = source.sourceConfig.tiles[0] || ""
-      if (key == 'mapbox') {
+      if (key == "mapbox") {
         tileUrl = tileUrl.replace("{API_KEY}", mapboxKey || "")
-      } else if (key == 'maptiler') {
+      } else if (key == "maptiler") {
         tileUrl = tileUrl.replace("{API_KEY}", maptilerKey || "")
       }
       // console.log('tileUrl', tileUrl)
       return tileUrl
-    }
-    , [mapboxKey, maptilerKey])
+    },
+    [mapboxKey, maptilerKey])
 
+  const getSourceConfig = useCallback(
+    (sourceKey: string): { encoding: string; tileUrl: string; tileSize: number } | null => {
+      // Check if it's a built-in source
+      if (terrainSources[sourceKey]) {
+        const source = terrainSources[sourceKey]
+        return {
+          encoding: source.encoding,
+          tileUrl: getTilesUrl(sourceKey),
+          tileSize: source.sourceConfig.tileSize || 256,
+        }
+      }
+
+      // Check if it's a custom source
+      const customSource = customTerrainSources.find((s) => s.id === sourceKey)
+      if (customSource) {
+        const encoding = customSource.type === "terrainrgb" ? "terrainrgb" : "terrarium"
+        const tileUrl = getCustomSourceUrl(customSource)
+        return {
+          encoding,
+          tileUrl,
+          tileSize: 256, // Default tile size for custom sources
+        }
+      }
+
+      return null
+    },
+    [customTerrainSources, getTilesUrl],
+  )
+
+
+  const linkCallback = useCallback(
+    (link: string) => () => window.open(templateLink(link, state.lat, state.lng), "_blank"),
+    [state.lat, state.lng]
+  )
 
   const [titilerEndpoint, setTitilerEndpoint] = useAtom(titilerEndpointAtom)
   const [maxResolution, setMaxResolution] = useAtom(maxResolutionAtom)
@@ -157,11 +208,11 @@ export function TerrainControls({ state, setState, getMapBounds, mapRef }: Terra
   }
 
   const getTitilerDownloadUrl = () => {
-    const source = terrainSources[state.sourceA]
-    if (!source?.sourceConfig?.tiles?.[0]) return ""
-    const tileUrl = getTilesUrl(state.sourceA)
-    const tileSize = source.sourceConfig.tileSize || 256
-    const wmsXml = buildGdalWmsXml(tileUrl, tileSize)
+    // Use getSourceConfig helper
+    const sourceConfig = getSourceConfig(state.sourceA)
+    if (!sourceConfig) return ""
+
+    const wmsXml = buildGdalWmsXml(sourceConfig.tileUrl, sourceConfig.tileSize)
     const bounds = getMapBounds()
     const width = maxResolution // Use maxResolution from Jotai atom
     const height = maxResolution // Use maxResolution from Jotai atom
@@ -169,15 +220,16 @@ export function TerrainControls({ state, setState, getMapBounds, mapRef }: Terra
   }
 
   const getSourceUrl = () => {
-    const source = terrainSources[state.sourceA]
-    return source?.sourceConfig?.tiles?.[0] || ""
+    // Use getSourceConfig helper
+    const sourceConfig = getSourceConfig(state.sourceA)
+    return sourceConfig?.tileUrl || ""
   }
 
   const takeScreenshot = async () => {
     if (!mapRef.current) return
     let filename = `terrain-composited-${(new Date()).toISOString()}`
     if (state.viewMode === "2d") {
-      filename += '-epsg4326'
+      filename += "-epsg4326"
     }
 
     try {
@@ -245,7 +297,6 @@ export function TerrainControls({ state, setState, getMapBounds, mapRef }: Terra
       //   saveAs(blob, "composited_epsg4326.tif");
       // })
       // .catch((err) => console.error("Composited GeoTIFF export error:", err));
-
     } catch (error) {
       console.error("Failed to take screenshot:", error)
     }
@@ -268,8 +319,12 @@ export function TerrainControls({ state, setState, getMapBounds, mapRef }: Terra
 
       const width = image.getWidth()
       const height = image.getHeight()
-      const source = terrainSources[state.sourceA]
-      const encoding = source.encoding
+      const sourceConfig = getSourceConfig(state.sourceA)
+      if (!sourceConfig) {
+        console.error("Source config not found")
+        return
+      }
+      const encoding = sourceConfig.encoding
 
       const elevationData = new Float32Array(width * height)
       const r = rasters[0]
@@ -317,6 +372,64 @@ export function TerrainControls({ state, setState, getMapBounds, mapRef }: Terra
     }
   }
 
+  const openAddSourceModal = () => {
+    setEditingSource(null)
+    setNewSourceName("")
+    setNewSourceUrl("")
+    setNewSourceType("cog")
+    setNewSourceDescription("")
+    setIsAddSourceModalOpen(true)
+  }
+
+  const openEditSourceModal = (source: CustomTerrainSource) => {
+    setEditingSource(source)
+    setNewSourceName(source.name)
+    setNewSourceUrl(source.url)
+    setNewSourceType(source.type)
+    setNewSourceDescription(source.description || "")
+    setIsAddSourceModalOpen(true)
+  }
+
+  const saveCustomSource = () => {
+    if (!newSourceName || !newSourceUrl) return
+
+    if (editingSource) {
+      // Edit existing source
+      setCustomTerrainSources(
+        customTerrainSources.map((s) =>
+          s.id === editingSource.id
+            ? { ...s, name: newSourceName, url: newSourceUrl, type: newSourceType, description: newSourceDescription }
+            : s,
+        ),
+      )
+    } else {
+      // Add new source
+      const newSource: CustomTerrainSource = {
+        id: `custom-${Date.now()}`,
+        name: newSourceName,
+        url: newSourceUrl,
+        type: newSourceType,
+        description: newSourceDescription,
+      }
+      setCustomTerrainSources([...customTerrainSources, newSource])
+    }
+
+    setIsAddSourceModalOpen(false)
+  }
+
+  const deleteCustomSource = (id: string) => {
+    setCustomTerrainSources(customTerrainSources.filter((s) => s.id !== id))
+    // If the deleted source was selected, reset to default
+    if (state.sourceA === id) setState({ sourceA: "aws" })
+    if (state.sourceB === id) setState({ sourceB: "mapterhorn" })
+  }
+
+  const getCustomSourceUrl = (source: CustomTerrainSource) => {
+    if (source.type === "cog") {
+      return `${titilerEndpoint}/cog/tiles/WebMercatorQuad/{z}/{x}/{y}@1x.png?url=${encodeURIComponent(source.url)}&algorithm=terrarium`
+    }
+    return source.url
+  }
   if (!isSidebarOpen) {
     return (
       <Button
@@ -329,16 +442,6 @@ export function TerrainControls({ state, setState, getMapBounds, mapRef }: Terra
       </Button>
     )
   }
-
-  // const linkTemplated:string = useEffect(
-  //   () => templateLink(link, state.lat, state.lng),
-  //   [state.lat, state.lng]
-  // )
-
-  const linkCallback = useCallback(
-    (link: string) => () => window.open(templateLink(link, state.lat, state.lng), "_blank"),
-    [state.lat, state.lng]
-  )
 
   return (
     <Card className="absolute right-4 top-4 bottom-4 w-96 overflow-y-auto p-4 gap-2 space-y-2 bg-background/95 backdrop-blur text-base">
@@ -704,8 +807,8 @@ export function TerrainControls({ state, setState, getMapBounds, mapRef }: Terra
                       if (value === "a") setState({ sourceA: key })
                       else if (value === "b") setState({ sourceB: key })
                     }}
-                    className={`border rounded-md shrink-0 ${(key !== 'google3dtiles') ? 'cursor-pointer' : 'cursor-not-allowed'}`}
-                    disabled={key == 'google3dtiles'}
+                    className={`border rounded-md shrink-0 ${key !== "google3dtiles" ? "cursor-pointer" : "cursor-not-allowed"}`}
+                    disabled={key == "google3dtiles"}
                   >
                     <ToggleGroupItem value="a" className="px-3 cursor-pointer data-[state=on]:font-bold">
                       A
@@ -714,7 +817,11 @@ export function TerrainControls({ state, setState, getMapBounds, mapRef }: Terra
                       B
                     </ToggleGroupItem>
                   </ToggleGroup>
-                  <Label className={`flex-1 text-sm cursor-pointer ${(key !== 'google3dtiles') ? 'cursor-pointer' : 'cursor-not-allowed'}`}>{config.name}</Label>
+                  <Label
+                    className={`flex-1 text-sm cursor-pointer ${key !== "google3dtiles" ? "cursor-pointer" : "cursor-not-allowed"}`}
+                  >
+                    {config.name}
+                  </Label>
                   {/* <TooltipProvider> */}
                   <Tooltip>
                     <TooltipTrigger asChild>
@@ -740,12 +847,12 @@ export function TerrainControls({ state, setState, getMapBounds, mapRef }: Terra
                               <span className="font-semibold">Link:</span>
                               <div className="flex items-center gap-2 mt-1">
                                 <a
-                                  href={config.link.split('#')[0]}
+                                  href={config.link.split("#")[0]}
                                   target="_blank"
                                   rel="noopener noreferrer"
                                   className="text-blue-600 hover:underline flex-1 truncate"
                                 >
-                                  {config.link.split('#')[0]}
+                                  {config.link.split("#")[0]}
                                 </a>
                               </div>
                             </div>
@@ -764,9 +871,7 @@ export function TerrainControls({ state, setState, getMapBounds, mapRef }: Terra
                                   <Copy className="h-4 w-4" />
                                 </Button>
                               </div>
-                              <code className="block p-3 bg-muted rounded text-xs break-all">
-                                {getTilesUrl(key)}
-                              </code>
+                              <code className="block p-3 bg-muted rounded text-xs break-all">{getTilesUrl(key)}</code>
                             </div>
                             <div>
                               <span className="font-semibold">Max Zoom:</span> {config.sourceConfig.maxzoom}
@@ -795,8 +900,16 @@ export function TerrainControls({ state, setState, getMapBounds, mapRef }: Terra
             <RadioGroup value={state.sourceA} onValueChange={(value) => setState({ sourceA: value })}>
               {Object.entries(terrainSources).map(([key, config]) => (
                 <div key={key} className="flex items-center gap-2">
-                  <RadioGroupItem value={key} id={`source-${key}`} className="cursor-pointer" disabled={key == 'google3dtiles'} />
-                  <Label htmlFor={`source-${key}`} className={`flex-1 text-sm ${(key !== 'google3dtiles') ? 'cursor-pointer' : 'cursor-not-allowed'}`}>
+                  <RadioGroupItem
+                    value={key}
+                    id={`source-${key}`}
+                    className="cursor-pointer"
+                    disabled={key == "google3dtiles"}
+                  />
+                  <Label
+                    htmlFor={`source-${key}`}
+                    className={`flex-1 text-sm ${key !== "google3dtiles" ? "cursor-pointer" : "cursor-not-allowed"}`}
+                  >
                     {config.name}
                   </Label>
                   {/* <TooltipProvider> */}
@@ -804,7 +917,7 @@ export function TerrainControls({ state, setState, getMapBounds, mapRef }: Terra
                     <TooltipTrigger asChild>
                       <Dialog>
                         <DialogTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0 cursor-pointer" >
+                          <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0 cursor-pointer">
                             <Info className="h-4 w-4" />
                           </Button>
                         </DialogTrigger>
@@ -824,12 +937,12 @@ export function TerrainControls({ state, setState, getMapBounds, mapRef }: Terra
                               <span className="font-semibold">Link:</span>
                               <div className="flex items-center gap-2 mt-1">
                                 <a
-                                  href={config.link.split('#')[0]}
+                                  href={config.link.split("#")[0]}
                                   target="_blank"
                                   rel="noopener noreferrer"
                                   className="text-blue-600 hover:underline flex-1 truncate"
                                 >
-                                  {config.link.split('#')[0]}
+                                  {config.link.split("#")[0]}
                                 </a>
                               </div>
                             </div>
@@ -848,9 +961,7 @@ export function TerrainControls({ state, setState, getMapBounds, mapRef }: Terra
                                   <Copy className="h-4 w-4" />
                                 </Button>
                               </div>
-                              <code className="block p-3 bg-muted rounded text-xs break-all">
-                                {getTilesUrl(key)}
-                              </code>
+                              <code className="block p-3 bg-muted rounded text-xs break-all">{getTilesUrl(key)}</code>
                             </div>
                             <div>
                               <span className="font-semibold">Max Zoom:</span> {config.sourceConfig.maxzoom}
@@ -876,6 +987,99 @@ export function TerrainControls({ state, setState, getMapBounds, mapRef }: Terra
               ))}
             </RadioGroup>
           )}
+
+          {/* Bring Your Own Data */}
+          <Collapsible open={isByodOpen} onOpenChange={setIsByodOpen} className="mt-4">
+            <CollapsibleTrigger className="flex items-center justify-between w-full py-1 text-sm font-medium cursor-pointer pl-2.5">
+              Bring Your Own Data
+              <ChevronDown className={`h-4 w-4 transition-transform ${isByodOpen ? "rotate-180" : ""}`} />
+            </CollapsibleTrigger>
+            <CollapsibleContent className="space-y-2 pt-1">
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full cursor-pointer bg-transparent"
+                onClick={openAddSourceModal}
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Add new terrain dataset
+              </Button>
+
+              {customTerrainSources.length > 0 && (
+                <div className="space-y-2">
+                  {state.splitScreen ? (
+                    <>
+                      {customTerrainSources.map((source) => (
+                        <div key={source.id} className="flex items-center gap-2">
+                          <ToggleGroup
+                            type="single"
+                            value={state.sourceA === source.id ? "a" : state.sourceB === source.id ? "b" : ""}
+                            onValueChange={(value) => {
+                              if (value === "a") setState({ sourceA: source.id })
+                              else if (value === "b") setState({ sourceB: source.id })
+                            }}
+                            className="border rounded-md shrink-0 cursor-pointer"
+                          >
+                            <ToggleGroupItem value="a" className="px-3 cursor-pointer data-[state=on]:font-bold">
+                              A
+                            </ToggleGroupItem>
+                            <ToggleGroupItem value="b" className="px-3 cursor-pointer data-[state=on]:font-bold">
+                              B
+                            </ToggleGroupItem>
+                          </ToggleGroup>
+                          <Label className="flex-1 text-sm cursor-pointer truncate">{source.name}</Label>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 shrink-0 cursor-pointer"
+                            onClick={() => openEditSourceModal(source)}
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 shrink-0 cursor-pointer"
+                            onClick={() => deleteCustomSource(source.id)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ))}
+                    </>
+                  ) : (
+                    <RadioGroup value={state.sourceA} onValueChange={(value) => setState({ sourceA: value })}>
+                      {customTerrainSources.map((source) => (
+                        <div key={source.id} className="flex items-center gap-2">
+                          <RadioGroupItem value={source.id} id={`source-${source.id}`} className="cursor-pointer" />
+                          <Label htmlFor={`source-${source.id}`} className="flex-1 text-sm cursor-pointer truncate">
+                            {source.name}
+                          </Label>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 shrink-0 cursor-pointer"
+                            onClick={() => openEditSourceModal(source)}
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 shrink-0 cursor-pointer"
+                            onClick={() => deleteCustomSource(source.id)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ))}
+                    </RadioGroup>
+                  )}
+                </div>
+              )}
+            </CollapsibleContent>
+          </Collapsible>
+
         </CollapsibleContent>
       </Collapsible>
 
@@ -949,7 +1153,7 @@ export function TerrainControls({ state, setState, getMapBounds, mapRef }: Terra
               </TooltipTrigger>
               <TooltipContent>
                 <p className="text-xs">
-                  Copy TMS/XYZ tileset source URL, uses {terrainSources[state.sourceA].encoding} encoding
+                  Copy TMS/XYZ tileset source URL, uses {getSourceConfig(state.sourceA)?.encoding || "unknown"} encoding
                 </p>
               </TooltipContent>
             </Tooltip>
@@ -1051,328 +1255,320 @@ export function TerrainControls({ state, setState, getMapBounds, mapRef }: Terra
 
       <Separator />
 
-      {
-        state.showHillshade && (
-          <>
-            <Collapsible open={isHillshadeOpen} onOpenChange={setIsHillshadeOpen}>
-              <CollapsibleTrigger className="flex items-center justify-between w-full py-1 text-base font-medium cursor-pointer">
-                Hillshade Options
-                <ChevronDown className={`h-4 w-4 transition-transform ${isHillshadeOpen ? "rotate-180" : ""}`} />
-              </CollapsibleTrigger>
-              <CollapsibleContent className="space-y-2 pt-1">
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium">Hillshade Method</Label>
-                  <div className="flex gap-2">
-                    <Select value={state.hillshadeMethod} onValueChange={(value) => setState({ hillshadeMethod: value })}>
-                      <SelectTrigger className="flex-1 cursor-pointer">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="combined">Combined</SelectItem>
-                        <SelectItem value="standard">Standard</SelectItem>
-                        <SelectItem value="multidir-colors">Aspect (Multidir Colors)</SelectItem>
-                        <SelectItem value="igor">Igor</SelectItem>
-                        <SelectItem value="basic">Basic</SelectItem>
-                        <SelectItem value="multidirectional">Multidirectional</SelectItem>
-                        <SelectItem value="aspect-multidir">Aspect classic (Multidir Colors)</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <div className="flex border rounded-md shrink-0">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => cycleHillshadeMethod(-1)}
-                        className="rounded-r-none border-r cursor-pointer"
-                      >
-                        <ChevronLeft className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => cycleHillshadeMethod(1)}
-                        className="rounded-l-none cursor-pointer"
-                      >
-                        <ChevronRight className="h-4 w-4" />
-                      </Button>
-                    </div>
+      {state.showHillshade && (
+        <>
+          <Collapsible open={isHillshadeOpen} onOpenChange={setIsHillshadeOpen}>
+            <CollapsibleTrigger className="flex items-center justify-between w-full py-1 text-base font-medium cursor-pointer">
+              Hillshade Options
+              <ChevronDown className={`h-4 w-4 transition-transform ${isHillshadeOpen ? "rotate-180" : ""}`} />
+            </CollapsibleTrigger>
+            <CollapsibleContent className="space-y-2 pt-1">
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">Hillshade Method</Label>
+                <div className="flex gap-2">
+                  <Select value={state.hillshadeMethod} onValueChange={(value) => setState({ hillshadeMethod: value })}>
+                    <SelectTrigger className="flex-1 cursor-pointer">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="combined">Combined</SelectItem>
+                      <SelectItem value="standard">Standard</SelectItem>
+                      <SelectItem value="multidir-colors">Aspect (Multidir Colors)</SelectItem>
+                      <SelectItem value="igor">Igor</SelectItem>
+                      <SelectItem value="basic">Basic</SelectItem>
+                      <SelectItem value="multidirectional">Multidirectional</SelectItem>
+                      <SelectItem value="aspect-multidir">Aspect classic (Multidir Colors)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <div className="flex border rounded-md shrink-0">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => cycleHillshadeMethod(-1)}
+                      className="rounded-r-none border-r cursor-pointer"
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => cycleHillshadeMethod(1)}
+                      className="rounded-l-none cursor-pointer"
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
                   </div>
                 </div>
+              </div>
 
-                {supportsIlluminationDirection && (
-                  <div className="space-y-1">
-                    <div className="flex items-center justify-between">
-                      <Label className="text-sm">Illumination Direction</Label>
-                      <span className="text-sm text-muted-foreground">{state.illuminationDir}°</span>
-                    </div>
-                    <Slider
-                      value={[state.illuminationDir]}
-                      onValueChange={([value]) => setState({ illuminationDir: value })}
-                      min={0}
-                      max={360}
-                      step={1}
-                      className="cursor-pointer"
-                    />
-                  </div>
-                )}
-
-                {supportsIlluminationAltitude && (
-                  <div className="space-y-1">
-                    <div className="flex items-center justify-between">
-                      <Label className="text-sm">Illumination Altitude</Label>
-                      <span className="text-sm text-muted-foreground">{state.illuminationAlt}°</span>
-                    </div>
-                    <Slider
-                      value={[state.illuminationAlt]}
-                      onValueChange={([value]) => setState({ illuminationAlt: value })}
-                      min={0}
-                      max={90}
-                      step={1}
-                      className="cursor-pointer"
-                    />
-                  </div>
-                )}
-
-                {supportsExaggeration && (
-                  <div className="space-y-1">
-                    <div className="flex items-center justify-between">
-                      <Label className="text-sm">Hillshade Exaggeration</Label>
-                      <span className="text-sm text-muted-foreground">{state.hillshadeExag.toFixed(1)}</span>
-                    </div>
-                    <Slider
-                      value={[state.hillshadeExag]}
-                      onValueChange={([value]) => setState({ hillshadeExag: value })}
-                      min={0}
-                      max={1}
-                      step={0.1}
-                      className="cursor-pointer"
-                    />
-                  </div>
-                )}
-
-                {(supportsShadowColor || supportsHighlightColor || supportsAccentColor) && (
-                  <Collapsible open={isColorsOpen} onOpenChange={setIsColorsOpen}>
-                    <CollapsibleTrigger className="flex items-center justify-between w-full py-0.5 text-sm font-medium cursor-pointer">
-                      Hillshade Colors
-                      <ChevronDown className={`h-4 w-4 transition-transform ${isColorsOpen ? "rotate-180" : ""}`} />
-                    </CollapsibleTrigger>
-                    <CollapsibleContent className="space-y-1 pt-1">
-                      <div
-                        className="grid gap-2"
-                        style={{
-                          gridTemplateColumns: supportsAccentColor ? "repeat(3, 1fr)" : "repeat(2, 1fr)",
-                        }}
-                      >
-                        {supportsShadowColor && (
-                          <div className="space-y-1">
-                            <Label className="text-xs">Shadow</Label>
-                            <Input
-                              type="color"
-                              value={state.shadowColor}
-                              onChange={(e) => setState({ shadowColor: e.target.value })}
-                              className="h-9 p-1 cursor-pointer border-none"
-                            />
-                          </div>
-                        )}
-                        {supportsHighlightColor && (
-                          <div className="space-y-1">
-                            <Label className="text-xs">Highlight</Label>
-                            <Input
-                              type="color"
-                              value={state.highlightColor}
-                              onChange={(e) => setState({ highlightColor: e.target.value })}
-                              className="h-9 p-1 cursor-pointer border-none"
-                            />
-                          </div>
-                        )}
-                        {supportsAccentColor && (
-                          <div className="space-y-1">
-                            <Label className="text-xs">Accent</Label>
-                            <Input
-                              type="color"
-                              value={state.accentColor}
-                              onChange={(e) => setState({ accentColor: e.target.value })}
-                              className="h-9 p-1 cursor-pointer border-none"
-                            />
-                          </div>
-                        )}
-                      </div>
-                    </CollapsibleContent>
-                  </Collapsible>
-                )}
-              </CollapsibleContent>
-            </Collapsible>
-            <Separator />
-          </>
-        )
-      }
-
-      {
-        state.showColorRelief && (
-          <>
-            <Collapsible open={isHypsoOpen} onOpenChange={setIsHypsoOpen}>
-              <CollapsibleTrigger className="flex items-center justify-between w-full py-1 text-base font-medium cursor-pointer">
-                Hypsometric Tint Options
-                <ChevronDown className={`h-4 w-4 transition-transform ${isHypsoOpen ? "rotate-180" : ""}`} />
-              </CollapsibleTrigger>
-              <CollapsibleContent className="space-y-2 pt-1">
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium">Color Ramp</Label>
-                  <div className="flex gap-2">
-                    <Select value={state.colorRamp} onValueChange={(value) => setState({ colorRamp: value })}>
-                      <SelectTrigger className="flex-1 cursor-pointer">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {Object.entries(colorRamps).map(([key, ramp]) => (
-                          <SelectItem key={key} value={key}>
-                            <div className="flex items-center gap-2">
-                              <div
-                                className="w-12 h-4 rounded-sm"
-                                style={{
-                                  background: `linear-gradient(to right, ${getGradientColors(ramp.colors)})`,
-                                }}
-                              />
-                              <span>{ramp.name}</span>
-                            </div>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <div className="flex border rounded-md shrink-0">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => cycleColorRamp(-1)}
-                        className="rounded-r-none border-r cursor-pointer"
-                      >
-                        <ChevronLeft className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => cycleColorRamp(1)}
-                        className="rounded-l-none cursor-pointer"
-                      >
-                        <ChevronRight className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <Checkbox
-                    id="advanced-ramps"
-                    checked={showAdvancedRamps}
-                    onCheckedChange={(checked) => setShowAdvancedRamps(!!checked)}
-                    className="cursor-pointer"
-                    disabled
-                  />
-                  <Label htmlFor="advanced-ramps" className="text-sm cursor-pointer text-muted-foreground">
-                    Load advanced color ramps (cpt2js)
-                  </Label>
-                </div>
-              </CollapsibleContent>
-            </Collapsible>
-            <Separator />
-          </>
-        )
-      }
-
-      {
-        state.showRasterBasemap && (
-          <>
-            <Collapsible open={isTerrainRasterOpen} onOpenChange={setIsTerrainRasterOpen}>
-              <CollapsibleTrigger className="flex items-center justify-between w-full py-1 text-base font-medium cursor-pointer">
-                Raster Basemap Options
-                <ChevronDown className={`h-4 w-4 transition-transform ${isTerrainRasterOpen ? "rotate-180" : ""}`} />
-              </CollapsibleTrigger>
-              <CollapsibleContent className="space-y-2 pt-1">
-                <div className="space-y-2">
-                  <Label className="text-sm">Source</Label>
-                  <div className="flex gap-2">
-                    <Select value={state.terrainSource} onValueChange={(value) => setState({ terrainSource: value })}>
-                      <SelectTrigger className="flex-1 cursor-pointer">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="google">Google Hybrid</SelectItem>
-                        <SelectItem value="mapbox">Mapbox Satellite</SelectItem>
-                        <SelectItem value="esri">ESRI World Imagery</SelectItem>
-                        <SelectItem value="googlesat">Google Satellite</SelectItem>
-                        <SelectItem value="bing">Bing Aerial</SelectItem>
-                        <SelectItem value="osm">OpenStreetMap</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <div className="flex border rounded-md shrink-0">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => cycleTerrainSource(-1)}
-                        className="rounded-r-none border-r cursor-pointer"
-                      >
-                        <ChevronLeft className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => cycleTerrainSource(1)}
-                        className="rounded-l-none cursor-pointer"
-                      >
-                        <ChevronRight className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              </CollapsibleContent>
-            </Collapsible>
-            <Separator />
-          </>
-        )
-      }
-
-      {
-        state.showContours && (
-          <>
-            <Collapsible open={isContoursOpen} onOpenChange={setIsContoursOpen}>
-              <CollapsibleTrigger className="flex items-center justify-between w-full py-1 text-base font-medium cursor-pointer">
-                Contour Options
-                <ChevronDown className={`h-4 w-4 transition-transform ${isContoursOpen ? "rotate-180" : ""}`} />
-              </CollapsibleTrigger>
-              <CollapsibleContent className="space-y-2 pt-1">
+              {supportsIlluminationDirection && (
                 <div className="space-y-1">
                   <div className="flex items-center justify-between">
-                    <Label className="text-sm">Minor Interval (m)</Label>
-                    <span className="text-sm text-muted-foreground">{state.contourMinor}m</span>
+                    <Label className="text-sm">Illumination Direction</Label>
+                    <span className="text-sm text-muted-foreground">{state.illuminationDir}°</span>
                   </div>
                   <Slider
-                    value={[state.contourMinor]}
-                    onValueChange={([value]) => setState({ contourMinor: value })}
-                    min={10}
-                    max={100}
-                    step={10}
+                    value={[state.illuminationDir]}
+                    onValueChange={([value]) => setState({ illuminationDir: value })}
+                    min={0}
+                    max={360}
+                    step={1}
                     className="cursor-pointer"
                   />
                 </div>
+              )}
+
+              {supportsIlluminationAltitude && (
                 <div className="space-y-1">
                   <div className="flex items-center justify-between">
-                    <Label className="text-sm">Major Interval (m)</Label>
-                    <span className="text-sm text-muted-foreground">{state.contourMajor}m</span>
+                    <Label className="text-sm">Illumination Altitude</Label>
+                    <span className="text-sm text-muted-foreground">{state.illuminationAlt}°</span>
                   </div>
                   <Slider
-                    value={[state.contourMajor]}
-                    onValueChange={([value]) => setState({ contourMajor: value })}
-                    min={50}
-                    max={500}
-                    step={50}
+                    value={[state.illuminationAlt]}
+                    onValueChange={([value]) => setState({ illuminationAlt: value })}
+                    min={0}
+                    max={90}
+                    step={1}
                     className="cursor-pointer"
                   />
                 </div>
-              </CollapsibleContent>
-            </Collapsible>
-            <Separator />
-          </>
-        )
-      }
+              )}
+
+              {supportsExaggeration && (
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-sm">Hillshade Exaggeration</Label>
+                    <span className="text-sm text-muted-foreground">{state.hillshadeExag.toFixed(1)}</span>
+                  </div>
+                  <Slider
+                    value={[state.hillshadeExag]}
+                    onValueChange={([value]) => setState({ hillshadeExag: value })}
+                    min={0}
+                    max={1}
+                    step={0.1}
+                    className="cursor-pointer"
+                  />
+                </div>
+              )}
+
+              {(supportsShadowColor || supportsHighlightColor || supportsAccentColor) && (
+                <Collapsible open={isColorsOpen} onOpenChange={setIsColorsOpen}>
+                  <CollapsibleTrigger className="flex items-center justify-between w-full py-0.5 text-sm font-medium cursor-pointer">
+                    Hillshade Colors
+                    <ChevronDown className={`h-4 w-4 transition-transform ${isColorsOpen ? "rotate-180" : ""}`} />
+                  </CollapsibleTrigger>
+                  <CollapsibleContent className="space-y-1 pt-1">
+                    <div
+                      className="grid gap-2"
+                      style={{
+                        gridTemplateColumns: supportsAccentColor ? "repeat(3, 1fr)" : "repeat(2, 1fr)",
+                      }}
+                    >
+                      {supportsShadowColor && (
+                        <div className="space-y-1">
+                          <Label className="text-xs">Shadow</Label>
+                          <Input
+                            type="color"
+                            value={state.shadowColor}
+                            onChange={(e) => setState({ shadowColor: e.target.value })}
+                            className="h-9 p-1 cursor-pointer border-none"
+                          />
+                        </div>
+                      )}
+                      {supportsHighlightColor && (
+                        <div className="space-y-1">
+                          <Label className="text-xs">Highlight</Label>
+                          <Input
+                            type="color"
+                            value={state.highlightColor}
+                            onChange={(e) => setState({ highlightColor: e.target.value })}
+                            className="h-9 p-1 cursor-pointer border-none"
+                          />
+                        </div>
+                      )}
+                      {supportsAccentColor && (
+                        <div className="space-y-1">
+                          <Label className="text-xs">Accent</Label>
+                          <Input
+                            type="color"
+                            value={state.accentColor}
+                            onChange={(e) => setState({ accentColor: e.target.value })}
+                            className="h-9 p-1 cursor-pointer border-none"
+                          />
+                        </div>
+                      )}
+                    </div>
+                  </CollapsibleContent>
+                </Collapsible>
+              )}
+            </CollapsibleContent>
+          </Collapsible>
+          <Separator />
+        </>
+      )}
+
+      {state.showColorRelief && (
+        <>
+          <Collapsible open={isHypsoOpen} onOpenChange={setIsHypsoOpen}>
+            <CollapsibleTrigger className="flex items-center justify-between w-full py-1 text-base font-medium cursor-pointer">
+              Hypsometric Tint Options
+              <ChevronDown className={`h-4 w-4 transition-transform ${isHypsoOpen ? "rotate-180" : ""}`} />
+            </CollapsibleTrigger>
+            <CollapsibleContent className="space-y-2 pt-1">
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">Color Ramp</Label>
+                <div className="flex gap-2">
+                  <Select value={state.colorRamp} onValueChange={(value) => setState({ colorRamp: value })}>
+                    <SelectTrigger className="flex-1 cursor-pointer">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Object.entries(colorRamps).map(([key, ramp]) => (
+                        <SelectItem key={key} value={key}>
+                          <div className="flex items-center gap-2">
+                            <div
+                              className="w-12 h-4 rounded-sm"
+                              style={{
+                                background: `linear-gradient(to right, ${getGradientColors(ramp.colors)})`,
+                              }}
+                            />
+                            <span>{ramp.name}</span>
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <div className="flex border rounded-md shrink-0">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => cycleColorRamp(-1)}
+                      className="rounded-r-none border-r cursor-pointer"
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => cycleColorRamp(1)}
+                      className="rounded-l-none cursor-pointer"
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id="advanced-ramps"
+                  checked={showAdvancedRamps}
+                  onCheckedChange={(checked) => setShowAdvancedRamps(!!checked)}
+                  className="cursor-pointer"
+                  disabled
+                />
+                <Label htmlFor="advanced-ramps" className="text-sm cursor-pointer text-muted-foreground">
+                  Load advanced color ramps (cpt2js)
+                </Label>
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
+          <Separator />
+        </>
+      )}
+
+      {state.showRasterBasemap && (
+        <>
+          <Collapsible open={isTerrainRasterOpen} onOpenChange={setIsTerrainRasterOpen}>
+            <CollapsibleTrigger className="flex items-center justify-between w-full py-1 text-base font-medium cursor-pointer">
+              Raster Basemap Options
+              <ChevronDown className={`h-4 w-4 transition-transform ${isTerrainRasterOpen ? "rotate-180" : ""}`} />
+            </CollapsibleTrigger>
+            <CollapsibleContent className="space-y-2 pt-1">
+              <div className="space-y-2">
+                <Label className="text-sm">Source</Label>
+                <div className="flex gap-2">
+                  <Select value={state.terrainSource} onValueChange={(value) => setState({ terrainSource: value })}>
+                    <SelectTrigger className="flex-1 cursor-pointer">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="google">Google Hybrid</SelectItem>
+                      <SelectItem value="mapbox">Mapbox Satellite</SelectItem>
+                      <SelectItem value="esri">ESRI World Imagery</SelectItem>
+                      <SelectItem value="googlesat">Google Satellite</SelectItem>
+                      <SelectItem value="bing">Bing Aerial</SelectItem>
+                      <SelectItem value="osm">OpenStreetMap</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <div className="flex border rounded-md shrink-0">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => cycleTerrainSource(-1)}
+                      className="rounded-r-none border-r cursor-pointer"
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => cycleTerrainSource(1)}
+                      className="rounded-l-none cursor-pointer"
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
+          <Separator />
+        </>
+      )}
+
+      {state.showContours && (
+        <>
+          <Collapsible open={isContoursOpen} onOpenChange={setIsContoursOpen}>
+            <CollapsibleTrigger className="flex items-center justify-between w-full py-1 text-base font-medium cursor-pointer">
+              Contour Options
+              <ChevronDown className={`h-4 w-4 transition-transform ${isContoursOpen ? "rotate-180" : ""}`} />
+            </CollapsibleTrigger>
+            <CollapsibleContent className="space-y-2 pt-1">
+              <div className="space-y-1">
+                <div className="flex items-center justify-between">
+                  <Label className="text-sm">Minor Interval (m)</Label>
+                  <span className="text-sm text-muted-foreground">{state.contourMinor}m</span>
+                </div>
+                <Slider
+                  value={[state.contourMinor]}
+                  onValueChange={([value]) => setState({ contourMinor: value })}
+                  min={10}
+                  max={100}
+                  step={10}
+                  className="cursor-pointer"
+                />
+              </div>
+              <div className="space-y-1">
+                <div className="flex items-center justify-between">
+                  <Label className="text-sm">Major Interval (m)</Label>
+                  <span className="text-sm text-muted-foreground">{state.contourMajor}m</span>
+                </div>
+                <Slider
+                  value={[state.contourMajor]}
+                  onValueChange={([value]) => setState({ contourMajor: value })}
+                  min={50}
+                  max={500}
+                  step={50}
+                  className="cursor-pointer"
+                />
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
+          <Separator />
+        </>
+      )}
 
       <div className="text-xs text-muted-foreground space-y-1">
         <p>Inspired by:</p>
@@ -1401,8 +1597,81 @@ export function TerrainControls({ state, setState, getMapBounds, mapRef }: Terra
           </li>
         </ul>
       </div>
-    </Card >
-  )
+
+      {/* Bring Your Own Data Modal */}
+      <Dialog open={isAddSourceModalOpen} onOpenChange={setIsAddSourceModalOpen}>
+        <DialogContent className="sm:max-w-lg" showCloseButton={false}>
+          <DialogHeader>
+            <DialogTitle>{editingSource ? "Edit Terrain Dataset" : "Add New Terrain Dataset"}</DialogTitle>
+            <DialogDescription>
+              Add your own terrain data source from a COG, TerrainRGB, or Terrarium endpoint. COGs are tiled via the TiTiler instance, so this might be slow.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogClose
+            className="absolute top-4 right-4 cursor-pointer rounded-sm opacity-70 transition-opacity hover:opacity-100"
+            aria-label="Close"
+          >
+            ✕
+          </DialogClose>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="source-name">Name *</Label>
+              <Input
+                id="source-name"
+                type="text"
+                placeholder="My Custom Terrain"
+                value={newSourceName}
+                onChange={(e) => setNewSourceName(e.target.value)}
+                className="cursor-text"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="source-url">URL *</Label>
+              <Input
+                id="source-url"
+                type="text"
+                placeholder="https://example.com/terrain/{z}/{x}/{y}.png"
+                value={newSourceUrl}
+                onChange={(e) => setNewSourceUrl(e.target.value)}
+                className="cursor-text"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="source-type">Type *</Label>
+              <Select value={newSourceType} onValueChange={(value: any) => setNewSourceType(value)}>
+                <SelectTrigger id="source-type" className="cursor-pointer w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="cog">COG (Cloud Optimized GeoTIFF)</SelectItem>
+                  <SelectItem value="terrainrgb">TerrainRGB</SelectItem>
+                  <SelectItem value="terrarium">Terrarium</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="source-description">Description (optional)</Label>
+              <Input
+                id="source-description"
+                type="text"
+                placeholder="Custom terrain data from..."
+                value={newSourceDescription}
+                onChange={(e) => setNewSourceDescription(e.target.value)}
+                className="cursor-text"
+              />
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setIsAddSourceModalOpen(false)} className="cursor-pointer">
+                Cancel
+              </Button>
+              <Button onClick={saveCustomSource} disabled={!newSourceName || !newSourceUrl} className="cursor-pointer">
+                {editingSource ? "Save Changes" : "Add Source"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </Card>)
 }
 
 function getGradientColors(colors: any[]): string {
