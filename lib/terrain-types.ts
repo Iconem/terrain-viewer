@@ -1,4 +1,4 @@
-export type TerrainSource = "mapterhorn" | "maptiler" | "aws" | "mapbox" | "mapzen" | "bing" | "google3d"
+export type TerrainSource = "mapterhorn" | "maptiler" | "aws" | "mapbox" | "mapzen" | "bing" | "google3dtiles"
 
 export type HillshadeMethod = "standard" | "combined" | "igor" | "basic" | "multidirectional"
 
@@ -8,12 +8,12 @@ export interface TerrainSourceConfig {
   name: string
   link: string
   description: string
-  encoding: "terrarium" | "mapbox" | "terrainrgb" | "custom"
+  encoding: "terrarium" | "terrainrgb" | "3dtiles" | "custom" 
   sourceConfig: {
     type: "raster-dem"
     tiles: string[]
     tileSize: number
     maxzoom: number
-    encoding: "terrarium" | "mapbox" | "custom"
+    encoding: "terrarium" | "mapbox"| "3dtiles" | "custom"
   }
 }

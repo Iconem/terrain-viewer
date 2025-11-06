@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { useAtom } from "jotai"
 import {
   Camera,
@@ -65,6 +65,7 @@ import type { MapRef } from "react-map-gl/maplibre"
 import { domToPng, domToPixel } from "modern-screenshot"
 import { fromArrayBuffer, writeArrayBuffer } from "geotiff"
 import { saveAs } from "file-saver"
+import type { TerrainSource, TerrainSourceConfig } from "../lib/terrain-types"
 
 interface TerrainControlsProps {
   state: any
@@ -74,6 +75,7 @@ interface TerrainControlsProps {
 }
 
 export function TerrainControls({ state, setState, getMapBounds, mapRef }: TerrainControlsProps) {
+
   const [isColorsOpen, setIsColorsOpen] = useState(false)
   const [isSidebarOpen, setIsSidebarOpen] = useState(true)
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
@@ -93,6 +95,22 @@ export function TerrainControls({ state, setState, getMapBounds, mapRef }: Terra
   const [mapboxKey, setMapboxKey] = useAtom(mapboxKeyAtom)
   const [googleKey, setGoogleKey] = useAtom(googleKeyAtom)
   const [maptilerKey, setMaptilerKey] = useAtom(maptilerKeyAtom)
+
+  const getTilesUrl = useCallback(
+    function (key: TerrainSource) {
+      const source: TerrainSourceConfig = terrainSources[key]
+      let tileUrl = source.sourceConfig.tiles[0] || ""
+      if (key == 'mapbox') {
+        tileUrl = tileUrl.replace("{API_KEY}", mapboxKey || "")
+      } else if (key == 'maptiler') {
+        tileUrl = tileUrl.replace("{API_KEY}", maptilerKey || "")
+      }
+      console.log('tileUrl', tileUrl)
+      return tileUrl
+    }
+    , [mapboxKey, maptilerKey])
+
+
   const [titilerEndpoint, setTitilerEndpoint] = useAtom(titilerEndpointAtom)
   const [maxResolution, setMaxResolution] = useAtom(maxResolutionAtom)
   const [theme, setTheme] = useAtom(themeAtom)
@@ -139,7 +157,7 @@ export function TerrainControls({ state, setState, getMapBounds, mapRef }: Terra
   const getTitilerDownloadUrl = () => {
     const source = terrainSources[state.sourceA]
     if (!source?.sourceConfig?.tiles?.[0]) return ""
-    const tileUrl = source.sourceConfig.tiles[0]
+    const tileUrl = getTilesUrl(state.sourceA)
     const tileSize = source.sourceConfig.tileSize || 256
     const wmsXml = buildGdalWmsXml(tileUrl, tileSize)
     const bounds = getMapBounds()
@@ -668,7 +686,8 @@ export function TerrainControls({ state, setState, getMapBounds, mapRef }: Terra
                       if (value === "a") setState({ sourceA: key })
                       else if (value === "b") setState({ sourceB: key })
                     }}
-                    className="border rounded-md shrink-0"
+                    className={`border rounded-md shrink-0 ${(key !== 'google3dtiles') ? 'cursor-pointer' : 'cursor-not-allowed'}`}
+                    disabled={key == 'google3dtiles'}
                   >
                     <ToggleGroupItem value="a" className="px-3 cursor-pointer data-[state=on]:font-bold">
                       A
@@ -677,7 +696,7 @@ export function TerrainControls({ state, setState, getMapBounds, mapRef }: Terra
                       B
                     </ToggleGroupItem>
                   </ToggleGroup>
-                  <Label className="flex-1 text-sm cursor-pointer">{config.name}</Label>
+                  <Label className={`flex-1 text-sm cursor-pointer ${(key !== 'google3dtiles') ? 'cursor-pointer' : 'cursor-not-allowed'}`}>{config.name}</Label>
                   <TooltipProvider>
                     <Tooltip>
                       <TooltipTrigger asChild>
@@ -716,13 +735,13 @@ export function TerrainControls({ state, setState, getMapBounds, mapRef }: Terra
                                     variant="ghost"
                                     size="icon"
                                     className="h-8 w-8 cursor-pointer"
-                                    onClick={() => copyToClipboard(config.sourceConfig.tiles[0])}
+                                    onClick={() => copyToClipboard(getTilesUrl(key))}
                                   >
                                     <Copy className="h-4 w-4" />
                                   </Button>
                                 </div>
                                 <code className="block p-3 bg-muted rounded text-xs break-all">
-                                  {config.sourceConfig.tiles[0]}
+                                  {getTilesUrl(key)}
                                 </code>
                               </div>
                               <div>
@@ -752,8 +771,8 @@ export function TerrainControls({ state, setState, getMapBounds, mapRef }: Terra
             <RadioGroup value={state.sourceA} onValueChange={(value) => setState({ sourceA: value })}>
               {Object.entries(terrainSources).map(([key, config]) => (
                 <div key={key} className="flex items-center gap-2">
-                  <RadioGroupItem value={key} id={`source-${key}`} className="cursor-pointer" />
-                  <Label htmlFor={`source-${key}`} className="flex-1 text-sm cursor-pointer">
+                  <RadioGroupItem value={key} id={`source-${key}`} className="cursor-pointer" disabled={key == 'google3dtiles'} />
+                  <Label htmlFor={`source-${key}`} className={`flex-1 text-sm ${(key !== 'google3dtiles') ? 'cursor-pointer' : 'cursor-not-allowed'}`}>
                     {config.name}
                   </Label>
                   <TooltipProvider>
@@ -761,7 +780,7 @@ export function TerrainControls({ state, setState, getMapBounds, mapRef }: Terra
                       <TooltipTrigger asChild>
                         <Dialog>
                           <DialogTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0 cursor-pointer">
+                            <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0 cursor-pointer" >
                               <Info className="h-4 w-4" />
                             </Button>
                           </DialogTrigger>
@@ -794,13 +813,13 @@ export function TerrainControls({ state, setState, getMapBounds, mapRef }: Terra
                                     variant="ghost"
                                     size="icon"
                                     className="h-8 w-8 cursor-pointer"
-                                    onClick={() => copyToClipboard(config.sourceConfig.tiles[0])}
+                                    onClick={() => copyToClipboard(getTilesUrl(key))}
                                   >
                                     <Copy className="h-4 w-4" />
                                   </Button>
                                 </div>
                                 <code className="block p-3 bg-muted rounded text-xs break-all">
-                                  {config.sourceConfig.tiles[0]}
+                                  {getTilesUrl(key)}
                                 </code>
                               </div>
                               <div>
@@ -878,7 +897,7 @@ export function TerrainControls({ state, setState, getMapBounds, mapRef }: Terra
                 </TooltipTrigger>
                 <TooltipContent>
                   <p className="text-xs">
-                    Export Screenshot (composited with hillshade, hypsometric tint, raster basemap, etc) - warning, WIP
+                    Export Screenshot (composited with hillshade, hypsometric tint, raster basemap, etc)
                   </p>
                 </TooltipContent>
               </Tooltip>
@@ -942,28 +961,6 @@ export function TerrainControls({ state, setState, getMapBounds, mapRef }: Terra
             />
           </div>
 
-          {/* Hypsometric Tint */}
-          <div className="grid grid-cols-[auto_1fr_1fr] gap-2 items-center">
-            <Checkbox
-              id="color-relief"
-              checked={state.showColorRelief}
-              onCheckedChange={(checked) => setState({ showColorRelief: checked })}
-              className="cursor-pointer"
-            />
-            <Label htmlFor="color-relief" className="text-sm cursor-pointer">
-              Hypso Tint
-            </Label>
-            <Slider
-              value={[state.colorReliefOpacity]}
-              onValueChange={([value]) => setState({ colorReliefOpacity: value })}
-              min={0}
-              max={1}
-              step={0.1}
-              className="cursor-pointer"
-              disabled={!state.showColorRelief}
-            />
-          </div>
-
           {/* Contour Lines */}
           <div className="grid grid-cols-[auto_1fr_1fr] gap-2 items-center">
             <Checkbox
@@ -977,24 +974,46 @@ export function TerrainControls({ state, setState, getMapBounds, mapRef }: Terra
             </Label>
           </div>
 
+          {/* Hypsometric Tint */}
+          <div className="grid grid-cols-[auto_1fr_1fr] gap-2 items-center">
+            <Checkbox
+              id="color-relief"
+              checked={state.showColorRelief}
+              onCheckedChange={(checked) => setState({ showColorRelief: checked })}
+              className="cursor-pointer"
+            />
+            <Label htmlFor="color-relief" className="text-sm cursor-pointer">
+              Elevation Hypso
+            </Label>
+            <Slider
+              value={[state.colorReliefOpacity]}
+              onValueChange={([value]) => setState({ colorReliefOpacity: value })}
+              min={0}
+              max={1}
+              step={0.1}
+              className="cursor-pointer"
+              disabled={!state.showColorRelief}
+            />
+          </div>
+
           <div className="grid grid-cols-[auto_1fr_1fr] gap-2 items-center">
             <Checkbox
               id="terrain-raster"
-              checked={state.showTerrain}
-              onCheckedChange={(checked) => setState({ showTerrain: checked })}
+              checked={state.showRasterBasemap}
+              onCheckedChange={(checked) => setState({ showRasterBasemap: checked })}
               className="cursor-pointer"
             />
             <Label htmlFor="terrain-raster" className="text-sm cursor-pointer">
               Raster Basemap
             </Label>
             <Slider
-              value={[state.terrainOpacity]}
-              onValueChange={([value]) => setState({ terrainOpacity: value })}
+              value={[state.rasterBasemapOpacity]}
+              onValueChange={([value]) => setState({ rasterBasemapOpacity: value })}
               min={0}
               max={1}
               step={0.1}
               className="cursor-pointer"
-              disabled={!state.showTerrain}
+              disabled={!state.showRasterBasemap}
             />
           </div>
         </CollapsibleContent>
@@ -1018,12 +1037,13 @@ export function TerrainControls({ state, setState, getMapBounds, mapRef }: Terra
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="standard">Standard</SelectItem>
                       <SelectItem value="combined">Combined</SelectItem>
+                      <SelectItem value="standard">Standard</SelectItem>
+                      <SelectItem value="multidir-colors">Aspect (Multidir Colors)</SelectItem>
                       <SelectItem value="igor">Igor</SelectItem>
                       <SelectItem value="basic">Basic</SelectItem>
                       <SelectItem value="multidirectional">Multidirectional</SelectItem>
-                      <SelectItem value="multidir-colors">Multidir Colors</SelectItem>
+                      <SelectItem value="aspect-multidir">Aspect classic (Multidir Colors)</SelectItem>
                     </SelectContent>
                   </Select>
                   <div className="flex border rounded-md shrink-0">
@@ -1224,7 +1244,7 @@ export function TerrainControls({ state, setState, getMapBounds, mapRef }: Terra
         </>
       )}
 
-      {state.showTerrain && (
+      {state.showRasterBasemap && (
         <>
           <Collapsible open={isTerrainRasterOpen} onOpenChange={setIsTerrainRasterOpen}>
             <CollapsibleTrigger className="flex items-center justify-between w-full py-1 text-base font-medium cursor-pointer">

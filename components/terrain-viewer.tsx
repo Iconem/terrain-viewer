@@ -8,21 +8,16 @@ import { TerrainControls } from "./terrain-controls"
 import { GeocoderControl } from "./geocoder-control"
 import { terrainSources } from "@/lib/terrain-sources"
 import { colorRamps } from "@/lib/color-ramps"
-import type { TerrainSource } from "@/lib/terrain-types"
+import type { TerrainSource, TerrainSourceConfig } from "@/lib/terrain-types"
 
 import mlcontour from "maplibre-contour";
+import { useAtom } from "jotai"
+import {
+  mapboxKeyAtom,
+  maptilerKeyAtom,
+} from "@/lib/settings-atoms"
 
-const TerrainSources = memo(({ source }: { source: TerrainSource }) => {
-  const sourceConfig = terrainSources[source].sourceConfig
 
-  return (
-    <>
-      <Source id="terrainSource" key={`terrain-${source}`} {...sourceConfig} />
-      <Source id="hillshadeSource" key={`hillshade-${source}`} {...sourceConfig} />
-    </>
-  )
-})
-TerrainSources.displayName = "TerrainSources"
 
 const RasterSource = memo(
   ({ terrainSource, terrainRasterUrls }: { terrainSource: string; terrainRasterUrls: Record<string, string> }) => {
@@ -39,17 +34,17 @@ const RasterSource = memo(
 )
 RasterSource.displayName = "RasterSource"
 
-const RasterLayer = memo(({ showTerrain, terrainOpacity }: { showTerrain: boolean; terrainOpacity: number }) => {
+const RasterLayer = memo(({ showRasterBasemap, rasterBasemapOpacity }: { showRasterBasemap: boolean; rasterBasemapOpacity: number }) => {
   return (
     <Layer
       id="terrain-raster"
       type="raster"
       source="terrain-raster-source"
       paint={{
-        "raster-opacity": terrainOpacity,
+        "raster-opacity": rasterBasemapOpacity,
       }}
       layout={{
-        visibility: showTerrain ? "visible" : "none",
+        visibility: showRasterBasemap ? "visible" : "none",
       }}
     />
   )
@@ -160,8 +155,8 @@ export function TerrainViewer() {
     colorReliefOpacity: parseAsFloat.withDefault(0.35),
     showContours: parseAsBoolean.withDefault(false),
     colorRamp: parseAsString.withDefault("hypsometric"),
-    showTerrain: parseAsBoolean.withDefault(false),
-    terrainOpacity: parseAsFloat.withDefault(1.0),
+    showRasterBasemap: parseAsBoolean.withDefault(false),
+    rasterBasemapOpacity: parseAsFloat.withDefault(1.0),
     terrainSource: parseAsString.withDefault("google"),
     exaggeration: parseAsFloat.withDefault(1),
     lat: parseAsFloat.withDefault(45.9763),
@@ -180,9 +175,9 @@ export function TerrainViewer() {
     contourMajor: parseAsFloat.withDefault(200),
     minElevation: parseAsFloat.withDefault(0),
     maxElevation: parseAsFloat.withDefault(4000),
-    mapboxKey: parseAsString.withDefault(""),
-    googleKey: parseAsString.withDefault(""),
-    maptilerKey: parseAsString.withDefault(""),
+    // mapboxKey: parseAsString.withDefault(""),
+    // googleKey: parseAsString.withDefault(""),
+    // maptilerKey: parseAsString.withDefault(""),
     titilerEndpoint: parseAsString.withDefault("https://titiler.xyz"),
     maxResolution: parseAsFloat.withDefault(1024),
   })
@@ -192,9 +187,43 @@ export function TerrainViewer() {
   const supportsShadowColor = ["standard", "combined", "igor", "basic"].includes(state.hillshadeMethod)
   const supportsHighlightColor = ["standard", "combined", "igor", "basic"].includes(state.hillshadeMethod)
   const supportsAccentColor = state.hillshadeMethod === "standard"
-  const supportsExaggeration = ["standard", "combined", "multidirectional", "multidir-colors"].includes(
+  const supportsExaggeration = ["standard", "combined", "multidirectional", "multidir-colors", "aspect-multidir"].includes(
     state.hillshadeMethod,
   )
+
+  const [mapboxKey, setMapboxKey] = useAtom(mapboxKeyAtom)
+  const [maptilerKey, setMaptilerKey] = useAtom(maptilerKeyAtom)
+
+  const TerrainSources = // useMemo(
+    ({ source }: { source: TerrainSource }) => {
+
+      const getTilesUrl = useCallback(
+        function (key: TerrainSource) {
+          const source: TerrainSourceConfig = terrainSources[key]
+          let tileUrl = source.sourceConfig.tiles[0] || ""
+          if (key == 'mapbox') {
+            tileUrl = tileUrl.replace("{API_KEY}", mapboxKey || "")
+          } else if (key == 'maptiler') {
+            tileUrl = tileUrl.replace("{API_KEY}", maptilerKey || "")
+          }
+          console.log('tileUrl', tileUrl)
+          return tileUrl
+        }
+        , [mapboxKey, maptilerKey])
+
+      const sourceConfig = terrainSources[source].sourceConfig
+      sourceConfig.tiles[0] = getTilesUrl(source)
+
+      return (
+        <>
+          <Source id="terrainSource" key={`terrain-${source}`} {...sourceConfig} />
+          <Source id="hillshadeSource" key={`hillshade-${source}`} {...sourceConfig} />
+        </>
+      )
+    }
+  // , [mapboxKey, maptilerKey])
+  // TerrainSources.displayName = "TerrainSources"
+
 
   const hillshadePaint = useMemo(() => {
     const paint: any = {}
@@ -208,6 +237,12 @@ export function TerrainViewer() {
       paint["hillshade-shadow-color"] = ["#00bfff", "#0000ff", "#bf00ff", "#FF0080"]
       paint["hillshade-illumination-direction"] = [270, 315, 0, 45]
       paint["hillshade-illumination-altitude"] = [30, 30, 30, 30]
+    } else if (state.hillshadeMethod === "aspect-multidir") {
+      paint["hillshade-method"] = "multidirectional"
+      paint["hillshade-highlight-color"] = ["#CC0000", "#0000CC"]
+      paint["hillshade-shadow-color"] = ["#00CCCC", "#CCCC00"]
+      paint["hillshade-illumination-direction"] = [0, 270]
+      paint["hillshade-illumination-altitude"] = [30, 30]
     } else {
       if (supportsIlluminationDirection) {
         paint["hillshade-illumination-direction"] = state.illuminationDir
@@ -401,7 +436,7 @@ export function TerrainViewer() {
           pitch: Number.parseFloat(evt.viewState.pitch.toFixed(1)),
           bearing: Number.parseFloat(evt.viewState.bearing.toFixed(1)),
         }
-        setState(newState, { shallow: true })
+        // setState(newState, { shallow: true })
       }
     },
     [setState],
@@ -487,7 +522,7 @@ export function TerrainViewer() {
       >
         <TerrainSources source={source} />
         <RasterSource terrainSource={state.terrainSource} terrainRasterUrls={terrainRasterUrls} />
-        <RasterLayer showTerrain={state.showTerrain} terrainOpacity={state.terrainOpacity} />
+        <RasterLayer showRasterBasemap={state.showRasterBasemap} rasterBasemapOpacity={state.rasterBasemapOpacity} />
         <HillshadeLayer showHillshade={state.showHillshade} hillshadePaint={hillshadePaint} />
         <ColorReliefLayer showColorRelief={state.showColorRelief} colorReliefPaint={colorReliefPaint} />
 

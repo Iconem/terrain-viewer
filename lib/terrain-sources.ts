@@ -22,7 +22,7 @@ export const terrainSources: Record<TerrainSource, TerrainSourceConfig> = {
     sourceConfig: {
       type: "raster-dem",
       tiles: [
-        "https://api.mapbox.com/v4/mapbox.terrain-rgb/{z}/{x}/{y}.png?access_token=pk.eyJ1IjoiaWNvbmVtIiwiYSI6ImNpbXJycDBqODAwNG12cW0ydGF1NXZxa2sifQ.hgPcQvgkzpfYkHgfMRqcpw",
+        "https://api.mapbox.com/v4/mapbox.terrain-rgb/{z}/{x}/{y}.png?access_token={API_KEY}",
       ],
       tileSize: 256,
       maxzoom: 14,
@@ -36,7 +36,7 @@ export const terrainSources: Record<TerrainSource, TerrainSourceConfig> = {
     encoding: "terrainrgb",
     sourceConfig: {
       type: "raster-dem",
-      tiles: ["https://api.maptiler.com/tiles/terrain-rgb-v2/{z}/{x}/{y}.webp?key=FbPGGTCFE8IRiPECxIrp"],
+      tiles: ["https://api.maptiler.com/tiles/terrain-rgb-v2/{z}/{x}/{y}.webp?key={API_KEY}"],
       tileSize: 512,
       maxzoom: 12,
       encoding: "mapbox",
@@ -53,6 +53,17 @@ export const terrainSources: Record<TerrainSource, TerrainSourceConfig> = {
       tileSize: 256,
       maxzoom: 15,
       encoding: "terrarium",
+    },
+  },
+  google3dtiles: {
+    name: "Google 3D Tiles Terrain",
+    link: "https://mapsplatform.google.com/demos/3d-maps/",
+    description: "Google 3D Cities",
+    encoding: "3dtiles",
+    sourceConfig: {
+      type: "3dtiles",
+      tiles: ["https://tile.googleapis.com/v1/3dtiles/root.json?key={API_KEY}"],
+      encoding: "3dtiles",
     },
   },
 }
