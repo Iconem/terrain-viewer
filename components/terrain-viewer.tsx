@@ -11,7 +11,7 @@ import { colorRamps } from "@/lib/color-ramps"
 import type { TerrainSource, TerrainSourceConfig } from "@/lib/terrain-types"
 import mlcontour from "maplibre-contour"
 import { useAtom } from "jotai"
-import { mapboxKeyAtom, maptilerKeyAtom } from "../lib/settings-atoms"
+import { mapboxKeyAtom, maptilerKeyAtom } from "@/lib/settings-atoms"
 import { ColorReliefLayerSpecification, LayerSpecification } from "maplibre-gl"
 
 // Memoized Sources Component - loads once per source change

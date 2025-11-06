@@ -65,7 +65,7 @@ import type { MapRef } from "react-map-gl/maplibre"
 import { domToPng, domToPixel } from "modern-screenshot"
 import { fromArrayBuffer, writeArrayBuffer } from "geotiff"
 import saveAs from "file-saver"
-import type { TerrainSource, TerrainSourceConfig } from "../lib/terrain-types"
+import type { TerrainSource, TerrainSourceConfig } from "@/lib/terrain-types"
 
 interface TerrainControlsProps {
   state: any
@@ -715,71 +715,71 @@ export function TerrainControls({ state, setState, getMapBounds, mapRef }: Terra
                     </ToggleGroupItem>
                   </ToggleGroup>
                   <Label className={`flex-1 text-sm cursor-pointer ${(key !== 'google3dtiles') ? 'cursor-pointer' : 'cursor-not-allowed'}`}>{config.name}</Label>
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Dialog>
-                          <DialogTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0 cursor-pointer">
-                              <Info className="h-4 w-4" />
-                            </Button>
-                          </DialogTrigger>
-                          <DialogContent className="sm:max-w-lg" showCloseButton={false}>
-                            <DialogHeader>
-                              <DialogTitle>{config.name}</DialogTitle>
-                              <DialogDescription>{config.description}</DialogDescription>
-                            </DialogHeader>
-                            <DialogClose
-                              className="absolute top-4 right-4 cursor-pointer rounded-sm opacity-70 transition-opacity hover:opacity-100"
-                              aria-label="Close"
-                            >
-                              ✕
-                            </DialogClose>
-                            <div className="space-y-4 text-sm">
-                              <div>
-                                <span className="font-semibold">Link:</span>
-                                <div className="flex items-center gap-2 mt-1">
-                                  <a
-                                    href={config.link.split('#')[0]}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="text-blue-600 hover:underline flex-1 truncate"
-                                  >
-                                    {config.link.split('#')[0]}
-                                  </a>
-                                </div>
-                              </div>
-                              <div>
-                                <span className="font-semibold">Encoding Type:</span> {config.encoding}
-                              </div>
-                              <div>
-                                <div className="flex items-center justify-between mb-1">
-                                  <span className="font-semibold">URL Template:</span>
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-8 w-8 cursor-pointer"
-                                    onClick={() => copyToClipboard(getTilesUrl(key))}
-                                  >
-                                    <Copy className="h-4 w-4" />
-                                  </Button>
-                                </div>
-                                <code className="block p-3 bg-muted rounded text-xs break-all">
-                                  {getTilesUrl(key)}
-                                </code>
-                              </div>
-                              <div>
-                                <span className="font-semibold">Max Zoom:</span> {config.sourceConfig.maxzoom}
+                  {/* <TooltipProvider> */}
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Dialog>
+                        <DialogTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0 cursor-pointer">
+                            <Info className="h-4 w-4" />
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent className="sm:max-w-lg" showCloseButton={false}>
+                          <DialogHeader>
+                            <DialogTitle>{config.name}</DialogTitle>
+                            <DialogDescription>{config.description}</DialogDescription>
+                          </DialogHeader>
+                          <DialogClose
+                            className="absolute top-4 right-4 cursor-pointer rounded-sm opacity-70 transition-opacity hover:opacity-100"
+                            aria-label="Close"
+                          >
+                            ✕
+                          </DialogClose>
+                          <div className="space-y-4 text-sm">
+                            <div>
+                              <span className="font-semibold">Link:</span>
+                              <div className="flex items-center gap-2 mt-1">
+                                <a
+                                  href={config.link.split('#')[0]}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-blue-600 hover:underline flex-1 truncate"
+                                >
+                                  {config.link.split('#')[0]}
+                                </a>
                               </div>
                             </div>
-                          </DialogContent>
-                        </Dialog>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p>View source details</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
+                            <div>
+                              <span className="font-semibold">Encoding Type:</span> {config.encoding}
+                            </div>
+                            <div>
+                              <div className="flex items-center justify-between mb-1">
+                                <span className="font-semibold">URL Template:</span>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8 cursor-pointer"
+                                  onClick={() => copyToClipboard(getTilesUrl(key))}
+                                >
+                                  <Copy className="h-4 w-4" />
+                                </Button>
+                              </div>
+                              <code className="block p-3 bg-muted rounded text-xs break-all">
+                                {getTilesUrl(key)}
+                              </code>
+                            </div>
+                            <div>
+                              <span className="font-semibold">Max Zoom:</span> {config.sourceConfig.maxzoom}
+                            </div>
+                          </div>
+                        </DialogContent>
+                      </Dialog>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>View source details</p>
+                    </TooltipContent>
+                  </Tooltip>
+                  {/* </TooltipProvider> */}
                   <Button
                     variant="ghost"
                     size="icon"
@@ -799,71 +799,71 @@ export function TerrainControls({ state, setState, getMapBounds, mapRef }: Terra
                   <Label htmlFor={`source-${key}`} className={`flex-1 text-sm ${(key !== 'google3dtiles') ? 'cursor-pointer' : 'cursor-not-allowed'}`}>
                     {config.name}
                   </Label>
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Dialog>
-                          <DialogTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0 cursor-pointer" >
-                              <Info className="h-4 w-4" />
-                            </Button>
-                          </DialogTrigger>
-                          <DialogContent className="sm:max-w-lg" showCloseButton={false}>
-                            <DialogHeader>
-                              <DialogTitle>{config.name}</DialogTitle>
-                              <DialogDescription>{config.description}</DialogDescription>
-                              <DialogClose
-                                className="absolute top-4 right-4 cursor-pointer rounded-sm opacity-70 transition-opacity hover:opacity-100"
-                                aria-label="Close"
-                              >
-                                ✕
-                              </DialogClose>
-                            </DialogHeader>
-                            <div className="space-y-4 text-sm">
-                              <div>
-                                <span className="font-semibold">Link:</span>
-                                <div className="flex items-center gap-2 mt-1">
-                                  <a
-                                    href={config.link.split('#')[0]}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="text-blue-600 hover:underline flex-1 truncate"
-                                  >
-                                    {config.link.split('#')[0]}
-                                  </a>
-                                </div>
-                              </div>
-                              <div>
-                                <span className="font-semibold">Encoding Type:</span> {config.encoding}
-                              </div>
-                              <div>
-                                <div className="flex items-center justify-between mb-1">
-                                  <span className="font-semibold">URL Template:</span>
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-8 w-8 cursor-pointer"
-                                    onClick={() => copyToClipboard(getTilesUrl(key))}
-                                  >
-                                    <Copy className="h-4 w-4" />
-                                  </Button>
-                                </div>
-                                <code className="block p-3 bg-muted rounded text-xs break-all">
-                                  {getTilesUrl(key)}
-                                </code>
-                              </div>
-                              <div>
-                                <span className="font-semibold">Max Zoom:</span> {config.sourceConfig.maxzoom}
+                  {/* <TooltipProvider> */}
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Dialog>
+                        <DialogTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0 cursor-pointer" >
+                            <Info className="h-4 w-4" />
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent className="sm:max-w-lg" showCloseButton={false}>
+                          <DialogHeader>
+                            <DialogTitle>{config.name}</DialogTitle>
+                            <DialogDescription>{config.description}</DialogDescription>
+                            <DialogClose
+                              className="absolute top-4 right-4 cursor-pointer rounded-sm opacity-70 transition-opacity hover:opacity-100"
+                              aria-label="Close"
+                            >
+                              ✕
+                            </DialogClose>
+                          </DialogHeader>
+                          <div className="space-y-4 text-sm">
+                            <div>
+                              <span className="font-semibold">Link:</span>
+                              <div className="flex items-center gap-2 mt-1">
+                                <a
+                                  href={config.link.split('#')[0]}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-blue-600 hover:underline flex-1 truncate"
+                                >
+                                  {config.link.split('#')[0]}
+                                </a>
                               </div>
                             </div>
-                          </DialogContent>
-                        </Dialog>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p>View source details</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
+                            <div>
+                              <span className="font-semibold">Encoding Type:</span> {config.encoding}
+                            </div>
+                            <div>
+                              <div className="flex items-center justify-between mb-1">
+                                <span className="font-semibold">URL Template:</span>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8 cursor-pointer"
+                                  onClick={() => copyToClipboard(getTilesUrl(key))}
+                                >
+                                  <Copy className="h-4 w-4" />
+                                </Button>
+                              </div>
+                              <code className="block p-3 bg-muted rounded text-xs break-all">
+                                {getTilesUrl(key)}
+                              </code>
+                            </div>
+                            <div>
+                              <span className="font-semibold">Max Zoom:</span> {config.sourceConfig.maxzoom}
+                            </div>
+                          </div>
+                        </DialogContent>
+                      </Dialog>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>View source details</p>
+                    </TooltipContent>
+                  </Tooltip>
+                  {/* </TooltipProvider> */}
                   <Button
                     variant="ghost"
                     size="icon"
@@ -889,71 +889,71 @@ export function TerrainControls({ state, setState, getMapBounds, mapRef }: Terra
         </CollapsibleTrigger>
         <CollapsibleContent className="space-y-2 pt-1">
           <div className="flex gap-2">
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  {/* ADDED: Make export button right-clickable to copy URL, add spinner */}
-                  <Button
-                    variant="outline"
-                    className="flex-[2] bg-transparent cursor-pointer"
-                    onClick={exportDTM}
-                    onContextMenu={(e) => {
-                      e.preventDefault()
-                      const url = getTitilerDownloadUrl()
-                      copyToClipboard(url)
-                    }}
-                    disabled={isExporting}
-                  >
-                    {isExporting ? (
-                      <div className="h-4 w-4 mr-2 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                    ) : (
-                      <Download className="h-4 w-4 mr-2" />
-                    )}
-                    Export DTM
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p className="text-xs">Export DTM as GeoTIFF (raw Float32 elevation values)</p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
+            {/* <TooltipProvider> */}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                {/* ADDED: Make export button right-clickable to copy URL, add spinner */}
+                <Button
+                  variant="outline"
+                  className="flex-[2] bg-transparent cursor-pointer"
+                  onClick={exportDTM}
+                  onContextMenu={(e) => {
+                    e.preventDefault()
+                    const url = getTitilerDownloadUrl()
+                    copyToClipboard(url)
+                  }}
+                  disabled={isExporting}
+                >
+                  {isExporting ? (
+                    <div className="h-4 w-4 mr-2 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                  ) : (
+                    <Download className="h-4 w-4 mr-2" />
+                  )}
+                  Export DTM
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p className="text-xs">Export DTM as GeoTIFF (raw Float32 elevation values)</p>
+              </TooltipContent>
+            </Tooltip>
+            {/* </TooltipProvider> */}
 
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button variant="outline" className="flex-1 bg-transparent cursor-pointer" onClick={takeScreenshot}>
-                    <Camera className="h-4 w-4" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p className="text-xs">
-                    Export Screenshot (composited with hillshade, hypsometric tint, raster basemap, etc)
-                  </p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
+            {/* <TooltipProvider> */}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="outline" className="flex-1 bg-transparent cursor-pointer" onClick={takeScreenshot}>
+                  <Camera className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p className="text-xs">
+                  Export Screenshot (composited with hillshade, hypsometric tint, raster basemap, etc)
+                </p>
+              </TooltipContent>
+            </Tooltip>
+            {/* </TooltipProvider> */}
 
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className="flex-1 bg-transparent cursor-pointer"
-                    onClick={() => {
-                      const url = getSourceUrl()
-                      copyToClipboard(url)
-                    }}
-                  >
-                    <Copy className="h-4 w-4" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p className="text-xs">
-                    Copy TMS/XYZ tileset source URL, uses {terrainSources[state.sourceA].encoding} encoding
-                  </p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
+            {/* <TooltipProvider> */}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="outline"
+                  className="flex-1 bg-transparent cursor-pointer"
+                  onClick={() => {
+                    const url = getSourceUrl()
+                    copyToClipboard(url)
+                  }}
+                >
+                  <Copy className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p className="text-xs">
+                  Copy TMS/XYZ tileset source URL, uses {terrainSources[state.sourceA].encoding} encoding
+                </p>
+              </TooltipContent>
+            </Tooltip>
+            {/* </TooltipProvider> */}
           </div>
           <p className="text-xs text-muted-foreground">
             Export terrain as GeoTIFF via Titiler, take screenshot, or copy source URL for QGIS

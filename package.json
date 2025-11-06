@@ -4,10 +4,13 @@
   "author": "jochemla",
   "type": "module",
   "scripts": {
-    "build": "next build",
-    "dev": "next dev",
-    "lint": "next lint",
-    "start": "next start"
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "build_next": "next build",
+    "dev_next": "next dev",
+    "lint_next": "next lint",
+    "start_next": "next start"
   },
   "dependencies": {
     "@babel/core": "latest",
@@ -24,7 +27,7 @@
     "@radix-ui/react-toggle-group": "^1.1.1",
     "@radix-ui/react-tooltip": "^1.1.6",
     "@remix-run/react": "latest",
-    "@tailwindcss/postcss": "^4.1.9",
+    "@tailwindcss/vite": "^4.1.17",
     "@tanstack/react-router": "latest",
     "@vercel/analytics": "latest",
     "@vitejs/plugin-react": "latest",
@@ -68,7 +71,7 @@
     "@types/react-dom": "^18.3.1",
     "autoprefixer": "^10.4.20",
     "postcss": "^8.5",
-    "tailwindcss": "^4.1.9",
+    "tailwindcss": "^4.1.17",
     "typescript": "^5"
   }
 }
