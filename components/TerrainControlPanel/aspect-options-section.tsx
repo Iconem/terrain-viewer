@@ -10,22 +10,22 @@ import { colorRampsClassic, extractStops } from "@/lib/color-ramps"
 import { getGradientColors } from "@/lib/controls-utils"
 
 const DEFAULTS = {
-  slopeColorRamp: "slope-plantopo",
-  slopeMinDegrees: undefined,
-  slopeMaxDegrees: undefined,
-  slopeInvertColorRamp: false,
+  aspectColorRamp: "aspect-compass",
+  aspectMinDegrees: undefined,
+  aspectMaxDegrees: undefined,
+  aspectInvertColorRamp: false,
 }
 
 // Fields-only (no Section wrapper/gate) — embedded inside SlopeAndMoreOptionsSection,
-// which owns the "Slope" checkbox that conditionally renders this block underneath it.
-export const SlopeFields: React.FC<{
+// which owns the "Aspect" checkbox that conditionally renders this block underneath it.
+export const AspectFields: React.FC<{
   state: any; setState: (updates: any) => void
 }> = ({ state, setState }) => {
   const rampBounds = useMemo(() => {
-    const ramp = colorRampsClassic[state.slopeColorRamp] ?? colorRampsClassic["slope-plantopo"]
+    const ramp = colorRampsClassic[state.aspectColorRamp] ?? colorRampsClassic["aspect-compass"]
     const stops = extractStops(ramp.colors)
     return { min: Math.min(...stops), max: Math.max(...stops) }
-  }, [state.slopeColorRamp])
+  }, [state.aspectColorRamp])
 
   return (
     <div className="space-y-4 pl-6">
@@ -37,11 +37,11 @@ export const SlopeFields: React.FC<{
           </Button>
         </div>
         <Select
-          value={state.slopeColorRamp}
+          value={state.aspectColorRamp}
           onValueChange={(value) => setState({
-            slopeColorRamp: value,
-            slopeMinDegrees: undefined,
-            slopeMaxDegrees: undefined,
+            aspectColorRamp: value,
+            aspectMinDegrees: undefined,
+            aspectMaxDegrees: undefined,
           })}
         >
           <SelectTrigger className="w-full cursor-pointer">
@@ -65,39 +65,39 @@ export const SlopeFields: React.FC<{
 
       <div className="space-y-2">
         <div className="flex items-center justify-between">
-          <Label className="text-sm font-medium">Slope Range (°)</Label>
+          <Label className="text-sm font-medium">Aspect Range (°)</Label>
           <div className="flex items-center gap-2">
             <DraftBoundInput
-              value={state.slopeMinDegrees ?? rampBounds.min}
-              onCommit={(v) => setState({ slopeMinDegrees: v })}
+              value={state.aspectMinDegrees ?? rampBounds.min}
+              onCommit={(v) => setState({ aspectMinDegrees: v })}
               className="h-6 py-1 px-1 w-12 text-xs text-right bg-transparent border rounded"
             />
             <DraftBoundInput
-              value={state.slopeMaxDegrees ?? rampBounds.max}
-              onCommit={(v) => setState({ slopeMaxDegrees: v })}
+              value={state.aspectMaxDegrees ?? rampBounds.max}
+              onCommit={(v) => setState({ aspectMaxDegrees: v })}
               className="h-6 py-1 px-1 w-12 text-xs text-right bg-transparent border rounded"
             />
           </div>
         </div>
         <MobileSlider
-          sliderId="slope:range"
+          sliderId="aspect:range"
           min={0}
-          max={90}
+          max={360}
           step={1}
-          value={[state.slopeMinDegrees ?? rampBounds.min, state.slopeMaxDegrees ?? rampBounds.max]}
-          onValueChange={([min, max]) => setState({ slopeMinDegrees: Math.min(min, max), slopeMaxDegrees: Math.max(min, max) })}
+          value={[state.aspectMinDegrees ?? rampBounds.min, state.aspectMaxDegrees ?? rampBounds.max]}
+          onValueChange={([min, max]) => setState({ aspectMinDegrees: Math.min(min, max), aspectMaxDegrees: Math.max(min, max) })}
           className="w-full cursor-pointer"
         />
       </div>
 
       <div className="flex items-center gap-2">
         <Checkbox
-          id="slope-invert-color-ramp"
-          checked={state.slopeInvertColorRamp || false}
-          onCheckedChange={(checked) => setState({ slopeInvertColorRamp: checked === true })}
+          id="aspect-invert-color-ramp"
+          checked={state.aspectInvertColorRamp || false}
+          onCheckedChange={(checked) => setState({ aspectInvertColorRamp: checked === true })}
           className="cursor-pointer"
         />
-        <Label htmlFor="slope-invert-color-ramp" className="text-sm font-medium cursor-pointer">
+        <Label htmlFor="aspect-invert-color-ramp" className="text-sm font-medium cursor-pointer">
           Invert Color Ramp
         </Label>
       </div>
