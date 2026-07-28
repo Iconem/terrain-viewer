@@ -9,32 +9,30 @@ import { ColorRampSelectWithCustom, CustomRampStopsEditor } from "./custom-color
 import { colorRampsClassic, extractStops, DEFAULT_SLOPE_CUSTOM_STOPS } from "@/lib/color-ramps"
 
 const DEFAULTS = {
-  blobnessColorRamp: "blobness-default",
-  blobnessMin: undefined,
-  blobnessMax: undefined,
-  blobnessInvertColorRamp: false,
-  blobnessCustomStops: DEFAULT_SLOPE_CUSTOM_STOPS,
-  blobnessCustomStopsDiscrete: false,
+  orientationColorRamp: "orientation-default",
+  orientationMin: 0,
+  orientationMax: 180,
+  orientationInvertColorRamp: false,
+  orientationCustomStops: DEFAULT_SLOPE_CUSTOM_STOPS,
+  orientationCustomStopsDiscrete: false,
 }
 
 // Fields-only (no Section wrapper/gate) — embedded inside TerrainAnalysisOptionsSection,
-// which owns the "Blobness" checkbox that conditionally renders this block
-// underneath it. One of three Principal Components siblings (see also
-// eigen-ratio-options-section.tsx, orientation-options-section.tsx) — each its
-// own independent toggle reading a fixed mode off the same blobness://
-// structure-tensor protocol, not a shared mode selector.
-export const BlobnessFields: React.FC<{
+// which owns the "Dominant Orientation" checkbox that conditionally renders this
+// block underneath it. See blobness-options-section.tsx's header for why this
+// is a standalone sibling rather than a shared mode selector.
+export const OrientationFields: React.FC<{
   state: any; setState: (updates: any) => void
 }> = ({ state, setState }) => {
-  const isCustom = state.blobnessColorRamp === "custom"
-  const isDiscrete = state.blobnessCustomStopsDiscrete ?? false
-  const customStops = state.blobnessCustomStops ?? DEFAULT_SLOPE_CUSTOM_STOPS
+  const isCustom = state.orientationColorRamp === "custom"
+  const isDiscrete = state.orientationCustomStopsDiscrete ?? false
+  const customStops = state.orientationCustomStops ?? DEFAULT_SLOPE_CUSTOM_STOPS
 
   const rampBounds = useMemo(() => {
-    const ramp = colorRampsClassic[state.blobnessColorRamp as keyof typeof colorRampsClassic] ?? colorRampsClassic["blobness-default"]
+    const ramp = colorRampsClassic[state.orientationColorRamp as keyof typeof colorRampsClassic] ?? colorRampsClassic["orientation-default"]
     const stops = extractStops(ramp.colors)
     return { min: Math.min(...stops), max: Math.max(...stops) }
-  }, [state.blobnessColorRamp])
+  }, [state.orientationColorRamp])
 
   return (
     <div className="space-y-4 pl-6">
@@ -47,11 +45,11 @@ export const BlobnessFields: React.FC<{
         </div>
         <ColorRampSelectWithCustom
           ramps={colorRampsClassic}
-          value={state.blobnessColorRamp}
+          value={state.orientationColorRamp}
           onValueChange={(value) => setState({
-            blobnessColorRamp: value,
-            blobnessMin: undefined,
-            blobnessMax: undefined,
+            orientationColorRamp: value,
+            orientationMin: undefined,
+            orientationMax: undefined,
           })}
           anchorKey="slope-plantopo"
           customStops={customStops}
@@ -62,36 +60,34 @@ export const BlobnessFields: React.FC<{
       {isCustom ? (
         <CustomRampStopsEditor
           customStops={customStops}
-          onStopsChange={(stops) => setState({ blobnessCustomStops: stops })}
+          onStopsChange={(stops) => setState({ orientationCustomStops: stops })}
           isDiscrete={isDiscrete}
-          onDiscreteChange={(discrete) => setState({ blobnessCustomStopsDiscrete: discrete })}
+          onDiscreteChange={(discrete) => setState({ orientationCustomStopsDiscrete: discrete })}
         />
       ) : (
         <div className="space-y-2">
           <div className="flex items-center justify-between">
-            <Label className="text-sm font-medium">Blobness Range</Label>
+            <Label className="text-sm font-medium">Orientation Range (°)</Label>
             <div className="flex items-center gap-2">
               <DraftBoundInput
-                value={state.blobnessMin ?? rampBounds.min}
-                onCommit={(v) => setState({ blobnessMin: clampMinCommit(v, state.blobnessMax ?? rampBounds.max) })}
+                value={state.orientationMin ?? rampBounds.min}
+                onCommit={(v) => setState({ orientationMin: clampMinCommit(v, state.orientationMax ?? rampBounds.max) })}
                 className="h-6 py-1 px-1 w-12 text-xs text-right bg-transparent border rounded"
-                step={0.02}
               />
               <DraftBoundInput
-                value={state.blobnessMax ?? rampBounds.max}
-                onCommit={(v) => setState({ blobnessMax: clampMaxCommit(v, state.blobnessMin ?? rampBounds.min) })}
+                value={state.orientationMax ?? rampBounds.max}
+                onCommit={(v) => setState({ orientationMax: clampMaxCommit(v, state.orientationMin ?? rampBounds.min) })}
                 className="h-6 py-1 px-1 w-12 text-xs text-right bg-transparent border rounded"
-                step={0.02}
               />
             </div>
           </div>
           <MobileSlider
-            sliderId="blobness:range"
+            sliderId="orientation:range"
             min={0}
-            max={10}
-            step={0.02}
-            value={[state.blobnessMin ?? rampBounds.min, state.blobnessMax ?? rampBounds.max]}
-            onValueChange={([min, max]) => setState({ blobnessMin: Math.min(min, max), blobnessMax: Math.max(min, max) })}
+            max={180}
+            step={1}
+            value={[state.orientationMin ?? rampBounds.min, state.orientationMax ?? rampBounds.max]}
+            onValueChange={([min, max]) => setState({ orientationMin: Math.min(min, max), orientationMax: Math.max(min, max) })}
             className="w-full cursor-pointer"
           />
         </div>
@@ -99,12 +95,12 @@ export const BlobnessFields: React.FC<{
 
       <div className="flex items-center gap-2">
         <Checkbox
-          id="blobness-invert-color-ramp"
-          checked={state.blobnessInvertColorRamp || false}
-          onCheckedChange={(checked) => setState({ blobnessInvertColorRamp: checked === true })}
+          id="orientation-invert-color-ramp"
+          checked={state.orientationInvertColorRamp || false}
+          onCheckedChange={(checked) => setState({ orientationInvertColorRamp: checked === true })}
           className="cursor-pointer"
         />
-        <Label htmlFor="blobness-invert-color-ramp" className="text-sm font-medium cursor-pointer">
+        <Label htmlFor="orientation-invert-color-ramp" className="text-sm font-medium cursor-pointer">
           Invert Color Ramp
         </Label>
       </div>
