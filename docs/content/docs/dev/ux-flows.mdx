@@ -9,6 +9,8 @@ The data behind it is small and lives in the repo, under `ux-flows/`: a registry
 
 ## The three views
 
+![The Map view: the sitemap on the left, the selected screen's screenshot in the middle with the flow player docked under it, and the inspector on the right with the URL state and the connections](/screenshots/ui/ux-flows-map.jpg)
+
 ![The Canvas view: one frame per section of the sitemap, a box with a thumbnail per screen, and arrows for the moves the flows make between them. Hovering a box lights the routes into it in blue and out of it in gold.](/screenshots/ui/ux-flows-canvas.jpg)
 
 - **Map** - a sitemap on the left, grouped by feature; the selected screen's screenshot in the middle with its kind and evidence; on the right what the screen is, the URL parameters that produce it, the flows it is in, and where it is reached from and leads to. A flow player docks under the screenshot: a filmstrip of the steps, Previous and Next, and pills to choose a branch where the flow forks. The player's step and branch choices are in the page address, so a link reproduces a path exactly.
@@ -38,3 +40,5 @@ pnpm app                                        # http://localhost:5173/ux-flows
 ```
 
 In dev the page reads `ux-flows/out/`, where the capture wrote; `?assets=<url>` points it at any other folder, such as the release. `ux-flows/README.md` has the action format and the rest of the details.
+
+The page is built from the app's own shadcn components and theme tokens (sidebars, tabs, select, badges), follows the system colour scheme and has its own light/dark toggle in the header.

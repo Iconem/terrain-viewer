@@ -1,4 +1,9 @@
 import { useState } from 'react';
+import { ChevronRight } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import {
+  Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarHeader, SidebarInput, SidebarMenu, SidebarMenuBadge, SidebarMenuButton, SidebarMenuItem,
+} from '@/components/ui/sidebar';
 import type { Data, PathStep } from './model';
 import { ancestors } from './model';
 
@@ -21,41 +26,49 @@ export function Sitemap({ data, selected, path, onSelect }: {
     const isGroup = n.children.length > 0;
     const isOpen = q ? true : !closed.has(id) && (open.has(id) || depth === 0 || n.kind === 'group');
     const holdsSelection = !isOpen && selected && ancestors(data.nodes, selected).includes(id);
+    const step = stepOf[id];
     return (
-      <li role="treeitem" aria-expanded={isGroup ? isOpen : undefined} aria-selected={selected === id}>
-        <div className={`row ${selected === id ? 'selected' : ''} kind-${n.kind}`} style={{ paddingLeft: 8 + depth * 14 }}>
-          {isGroup ? (
-            <button className="chev" aria-label={isOpen ? 'Collapse' : 'Expand'} onClick={() => setClosed((c) => { const s = new Set(c); s.has(id) ? s.delete(id) : s.add(id); return s; })}>
-              {isOpen ? '▾' : '▸'}
-            </button>
-          ) : <span className="chev" />}
-          <button className="label" onClick={() => onSelect(id)} title={n.how || n.summary || n.label}>
-            {n.label}
-            {holdsSelection && <span className="muted"> · holds selection</span>}
-          </button>
-          {stepOf[id] && <span className="step-badge" title={`Step ${stepOf[id]} of the playing flow`}>{stepOf[id]}</span>}
-          {n.evidence === 'Not captured' && <span className="dot warn" title="Not captured" />}
-          {n.evidence === 'Specified' && <span className="dot spec" title="Specified, no screenshot yet" />}
-          {isGroup && !stepOf[id] && <span className="count">{n.children.length}</span>}
-        </div>
-        {isGroup && isOpen && <ul role="group">{n.children.map((c) => <Item key={c} id={c} depth={depth + 1} />)}</ul>}
-      </li>
+      <>
+        <SidebarMenuItem>
+          <SidebarMenuButton isActive={selected === id} onClick={() => onSelect(id)} title={n.how || n.summary || n.label}
+            className={cn('h-auto min-h-8 py-1', isGroup && 'font-medium', n.kind === 'state' && 'text-foreground/80')} style={{ paddingLeft: 8 + depth * 14 }}>
+            {isGroup ? (
+              <span role="button" aria-label={isOpen ? 'Collapse' : 'Expand'} className="-ml-1 flex size-5 shrink-0 items-center justify-center rounded hover:bg-sidebar-accent"
+                onClick={(e) => { e.stopPropagation(); setClosed((c) => { const s = new Set(c); s.has(id) ? s.delete(id) : s.add(id); return s; }); }}>
+                <ChevronRight className={cn('size-3.5 transition-transform', isOpen && 'rotate-90')} />
+              </span>
+            ) : <span className="size-5 shrink-0" />}
+            <span className="truncate">{n.label}{holdsSelection ? <span className="text-muted-foreground"> · holds selection</span> : null}</span>
+          </SidebarMenuButton>
+          {step ? (
+            <SidebarMenuBadge className="rounded-full bg-primary px-1.5 text-primary-foreground" title={`Step ${step} of the playing flow`}>{step}</SidebarMenuBadge>
+          ) : n.evidence && n.evidence !== 'Observed' ? (
+            <SidebarMenuBadge title={n.evidence}><span className={cn('block size-2 rounded-full', n.evidence === 'Not captured' ? 'bg-destructive' : 'bg-muted-foreground')} /></SidebarMenuBadge>
+          ) : isGroup ? (
+            <SidebarMenuBadge className="text-muted-foreground">{n.children.length}</SidebarMenuBadge>
+          ) : null}
+        </SidebarMenuItem>
+        {isGroup && isOpen && n.children.map((c) => <Item key={c} id={c} depth={depth + 1} />)}
+      </>
     );
   };
 
   return (
-    <aside className="sitemap">
-      <div className="pane-head">
-        <span>SITEMAP</span>
-        <input type="search" placeholder="Search screens" value={query} onChange={(e) => setQuery(e.target.value)} aria-label="Search screens" />
-      </div>
-      <ul role="tree" aria-label="Sitemap">
-        {data.products.map((p) => <Item key={p.id} id={p.root} depth={0} />)}
-      </ul>
-      <div className="legend">
-        <span><span className="step-badge">1</span> step on the playing flow</span>
-        <span><span className="dot spec" /> specified, not captured</span>
-      </div>
-    </aside>
+    <Sidebar collapsible="none" className="hidden h-full min-h-0 shrink-0 border-r md:flex">
+      <SidebarHeader>
+        <SidebarInput placeholder="Search screens" value={query} onChange={(e) => setQuery(e.target.value)} aria-label="Search screens" />
+      </SidebarHeader>
+      <SidebarContent>
+        <SidebarGroup>
+          <SidebarGroupContent>
+            <SidebarMenu>{data.products.map((p) => <Item key={p.id} id={p.root} depth={0} />)}</SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+        <div className="mt-auto space-y-1 border-t px-3 py-3 text-xs text-muted-foreground">
+          <div><span className="mr-1 inline-block rounded-full bg-primary px-1.5 text-[10px] font-semibold text-primary-foreground">1</span> step on the playing flow</div>
+          <div><span className="mr-2 inline-block size-2 rounded-full bg-muted-foreground" />specified, not captured</div>
+        </div>
+      </SidebarContent>
+    </Sidebar>
   );
 }

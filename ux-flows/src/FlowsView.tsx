@@ -1,10 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import mermaid from 'mermaid';
+import { Play } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
 import type { Data, Flow, PathStep } from './model';
-import { Badge } from './Stage';
+import { EvidenceBadge } from './Stage';
 
+// The diagrams render on their own light "paper" whatever the page's colour scheme, like a printed chart.
 mermaid.initialize({
-  startOnLoad: false, securityLevel: 'loose', theme: 'base', fontFamily: 'system-ui, sans-serif',
+  startOnLoad: false, securityLevel: 'loose', theme: 'base', fontFamily: 'ui-sans-serif, system-ui, sans-serif',
   flowchart: { htmlLabels: false, curve: 'basis', nodeSpacing: 36, rankSpacing: 48, useMaxWidth: false },
   themeVariables: { primaryColor: '#ffffff', primaryBorderColor: '#5b6b7f', primaryTextColor: '#1a2230', lineColor: '#5b6b7f', fontSize: '14px' },
 });
@@ -17,7 +21,7 @@ export function FlowsView({ data, flow, path, selectedNode, onPick, onPlay, onOp
   const host = useRef<HTMLDivElement>(null);
   const [svg, setSvg] = useState('');
   const [err, setErr] = useState('');
-  const [hover, setHover] = useState<{ node: string; x: number; y: number; flip: boolean } | null>(null);
+  const [hover, setHover] = useState<{ node: string; x: number; y: number } | null>(null);
   const seq = useRef(0);
 
   useEffect(() => {
@@ -50,7 +54,7 @@ export function FlowsView({ data, flow, path, selectedNode, onPick, onPlay, onOp
         if (!step?.node || !host.current) return;
         const hr = host.current.getBoundingClientRect(), br = g.getBoundingClientRect();
         const flip = br.right + 290 > hr.right;
-        setHover({ node: step.node, x: (flip ? br.left - 290 : br.right + 12) - hr.left + host.current.scrollLeft, y: br.top - hr.top + host.current.scrollTop - 8, flip });
+        setHover({ node: step.node, x: (flip ? br.left - 290 : br.right + 12) - hr.left + host.current.scrollLeft, y: br.top - hr.top + host.current.scrollTop - 8 });
       };
       g.onmouseleave = g.onblur = () => setHover(null);
       g.querySelector('.step-tag')?.remove();
@@ -69,7 +73,7 @@ export function FlowsView({ data, flow, path, selectedNode, onPick, onPlay, onOp
         }
       }
     });
-    // Edges: `<renderId>-L_<from>_<to>_<n>` (v11) or `L-<from>-<to>-<n>` (v10). The chosen arrow out of each path step is lit.
+    // Edges: `<renderId>-L_<from>_<to>_<n>`. The chosen arrow out of each path step is lit.
     const chosen = path.filter((s) => s.chosen).map((s) => [s.mid, s.chosen!.to]);
     root.querySelectorAll<SVGPathElement>('path.flowchart-link, .edgePath path').forEach((p) => {
       const lit = chosen.some(([f, t]) => p.id.includes(`L_${f}_${t}_`) || p.id.includes(`L-${f}-${t}-`));
@@ -77,55 +81,62 @@ export function FlowsView({ data, flow, path, selectedNode, onPick, onPlay, onOp
     });
   }, [svg, path, selectedNode, flow, data, onOpenNode]);
 
+  const Key = ({ cls, label }: { cls: string; label: string }) => <span className="inline-flex items-center gap-1.5"><i className={cn('inline-block', cls)} />{label}</span>;
+
   return (
-    <main className="flows">
-      <aside className="flow-list">
-        <h1>User flows</h1>
-        <p className="muted">Each flow follows one reviewer task. Select a box in the diagram to open its screen in the map.</p>
-        {data.flows.map((f) => (
-          <button key={f.id} className={`flow-card ${f.id === flow.id ? 'on' : ''}`} onClick={() => onPick(f.id)}>
-            <b>{f.id}</b> {f.title}<br /><span className="muted">{f.evidence} · {f.steps.filter((s) => s.node).length} screens</span>
+    <main className="grid min-h-0 flex-1 overflow-auto md:grid-cols-[minmax(220px,300px)_minmax(0,1fr)]">
+      <aside className="border-b p-5 md:border-b-0 md:border-r">
+        <h1 className="mb-1 text-lg font-semibold">User flows</h1>
+        <p className="mb-3 text-sm text-muted-foreground">Each flow follows one reviewer task. Select a box in the diagram to open its screen in the map.</p>
+        <div className="space-y-1.5">{data.flows.map((f) => (
+          <button key={f.id} className={cn('block w-full rounded-md border bg-card px-2.5 py-1.5 text-left text-sm hover:bg-accent', f.id === flow.id && 'border-primary bg-accent')} onClick={() => onPick(f.id)}>
+            <span className="mr-1.5 font-semibold text-primary">{f.id}</span>{f.title}
+            <div className="text-xs text-muted-foreground">{f.evidence} · {f.steps.filter((s) => s.node).length} screens</div>
           </button>
-        ))}
+        ))}</div>
       </aside>
-      <section className="flow-detail">
-        <div className="stage-head">
-          <h1>{flow.id} · {flow.title}</h1>
-          <Badge text={flow.evidence} />
-          <span className="spacer" />
-          <button className="primary" onClick={() => onPlay(flow.id)}>▶ Play in the map</button>
+      <section className="max-w-[1100px] p-5 md:px-8">
+        <div className="mb-2 flex flex-wrap items-center gap-2">
+          <h1 className="text-lg font-semibold">{flow.id} · {flow.title}</h1>
+          <EvidenceBadge text={flow.evidence} />
+          <span className="flex-1" />
+          <Button size="sm" onClick={() => onPlay(flow.id)}><Play /> Play in the map</Button>
         </div>
-        <p className="lede">{flow.intro}</p>
-        <div className="key">
-          <span><i className="k-screen" /> Screen</span><span><i className="k-decision" /> Decision</span>
-          <span><i className="k-main" /> Main route</span><span><i className="k-alt" /> Alternative</span><span><i className="k-opt" /> Optional or way back</span>
-          <span><i className="k-path" /> Selected path</span><span className="step-badge">1</span> Step number
+        <p className="mb-3 max-w-prose text-sm text-muted-foreground">{flow.intro}</p>
+        <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-1 rounded-md border bg-card px-3 py-2 text-xs text-muted-foreground">
+          <Key cls="h-3 w-5 border-2 border-neutral-500 bg-white" label="Screen" />
+          <Key cls="h-3 w-3 rotate-45 border-2 border-amber-400 bg-amber-50" label="Decision" />
+          <Key cls="w-5 border-t-[3px] border-neutral-500" label="Main route" />
+          <Key cls="w-5 border-t-[1.5px] border-neutral-500" label="Alternative" />
+          <Key cls="w-5 border-t-[1.5px] border-dashed border-neutral-500" label="Optional or way back" />
+          <Key cls="w-5 border-t-[3px] border-blue-500" label="Selected path" />
+          <span className="inline-flex items-center gap-1.5"><span className="inline-grid size-4 place-items-center rounded-full bg-blue-500 text-[10px] font-bold text-white">1</span>Step number</span>
         </div>
-        {err && <pre className="error">{err}</pre>}
-        <div className="diagram-wrap">
-          <div className="diagram" ref={host} dangerouslySetInnerHTML={{ __html: svg }} />
+        {err && <pre className="whitespace-pre-wrap text-xs text-destructive">{err}</pre>}
+        <div className="relative">
+          <div className="diagram overflow-auto rounded-lg border bg-white p-4 text-neutral-900" ref={host} dangerouslySetInnerHTML={{ __html: svg }} />
           {hover && (() => {
             const n = data.nodes[hover.node]; const shot = n.screens?.[0];
             return (
-              <div className="hover-card" style={{ left: hover.x, top: hover.y }}>
-                {shot ? <img src={shot.src} alt="" /> : <div className="noshot">No screenshot yet</div>}
+              <div className="pointer-events-none absolute z-10 grid w-[276px] gap-1 rounded-lg border bg-popover p-1.5 text-xs text-popover-foreground shadow-lg" style={{ left: hover.x, top: hover.y }}>
+                {shot ? <img src={shot.src} alt="" className="aspect-[16/10] w-full rounded object-cover" /> : <div className="grid aspect-[16/10] place-items-center rounded bg-muted text-muted-foreground">No screenshot yet</div>}
                 <b>{n.label}</b>
-                {n.how && <span className="muted small">{n.how}</span>}
+                {n.how && <span className="text-muted-foreground">{n.how}</span>}
               </div>
             );
           })()}
         </div>
-        <h2>Path</h2>
-        <ol className="path">
+        <h2 className="mb-1 mt-4 text-xs font-medium uppercase tracking-wide text-muted-foreground">Path</h2>
+        <ol className="list-decimal space-y-0.5 pl-6 text-sm">
           {path.map((s) => (
             <li key={s.mid}>
-              <button className="link" onClick={() => s.node ? onOpenNode(s.node, s.n) : onOpenNode(selectedNode ?? '', s.n)}>{s.label}</button>
-              {s.options.length > 1 && <span className="muted"> · branch: {s.options.map((o) => o.label || o.to).join(' / ')} → <b>{s.chosen?.label || s.chosen?.to || 'stop'}</b></span>}
-              {s.chosen?.weight === 'optional' && <span className="muted"> (way back)</span>}
+              <Button variant="link" size="sm" className="h-auto p-0 text-sm" onClick={() => s.node ? onOpenNode(s.node, s.n) : onOpenNode(selectedNode ?? '', s.n)}>{s.label}</Button>
+              {s.options.length > 1 && <span className="text-muted-foreground"> · branch: {s.options.map((o) => o.label || o.to).join(' / ')} → <b>{s.chosen?.label || s.chosen?.to || 'stop'}</b></span>}
+              {s.chosen?.weight === 'optional' && <span className="text-muted-foreground"> (way back)</span>}
             </li>
           ))}
         </ol>
-        <p className="muted">Source: <code>{flow.source}</code>. Edit the Mermaid there and run <code>npm run data</code>.</p>
+        <p className="mt-3 text-xs text-muted-foreground">Source: <code className="rounded bg-muted px-1">{flow.source}</code>. Edit the Mermaid there and run <code className="rounded bg-muted px-1">pnpm ux-flows:data</code>.</p>
       </section>
     </main>
   );
