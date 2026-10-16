@@ -9,6 +9,15 @@ Because every Terrain Viewer setting lives in the URL, most screens are captured
 taking a screenshot. States the URL cannot carry (picked points, a docked profile, a routing choice)
 list the in-app actions that agent-browser replays before the shot.
 
+## The UX flows source of truth
+
+Two sets of text files under `maps/` are the source of truth. Everything the page shows is derived from them; nothing in the viewer's code knows about any particular screen or flow.
+
+- **`screens.json`** is the registry of screens: id, group, label, the "how you get there" sentence, the URL parameters that produce the state, and for a few screens the agent-browser actions to replay. The sitemap tree, the groups, the inspector's URL state table and every capture URL come from it.
+- **`compare.md`, `relief.md`, `picker.md`** are the flows: an intro, notes and one Mermaid `flowchart TD` block each, whose node ids are screen ids from the registry. Arrow style carries meaning (thick `==>` main route, thin `-->` alternative, dotted `-.->` way back), diamond `{ }` nodes are decisions. The Flows diagram, the player's steps and branches, the Canvas arrows and the "reached from / leads to" links are all derived from those blocks.
+
+`scripts/build-data.mjs` joins the two with the capture manifest into `data.json`, the only thing the viewer reads. That file and the screenshots are build outputs, published as release assets, never committed. To add or change a screen or a flow, edit those files and recapture. The Mermaid parser handles the subset used there: node declarations with `[ ]`, `{ }` and `([ ])` shapes, the three arrow styles and `|label|` edge labels; subgraphs and styling directives are not supported.
+
 ## Where things are
 
 ```
