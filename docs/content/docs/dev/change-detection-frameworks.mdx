@@ -27,10 +27,21 @@ Polygons drawn at the same pixels in the three tools convert to the same EPSG:38
 
 ![CVAT: the after frame of the two-frame job, frame name encoding pair and side](/screenshots/change-detection/cvat-pair.jpg)
 
+![CVAT: a four-date series job built by cdtasks, on the Bing frame, in the Review workspace after cvat-stage moved it to validation](/screenshots/change-detection/cvat-series-review.jpg)
+
 The two chips as served by TiTiler for the same bbox, Esri World Imagery through a GDAL TMS source and the Amphipolis COG:
 
 ![Before chip, Esri World Imagery via TiTiler](/screenshots/change-detection/chip-before-esri.jpg)
 ![After chip, Amphipolis 10 cm COG via TiTiler](/screenshots/change-detection/chip-after-cog.jpg)
+
+## Not covered here: GIS-native workflows
+
+For teams already in QGIS, the alternative is to skip annotation tools altogether: QGIS with the QuickMapCompare plugin
+for synced viewports and swipe, polygons straight into PostGIS or a GeoPackage, and QField or Mergin Maps for
+assignment and offline capture with per-project roles and a change history. That route keeps the georeference
+native and the data model yours, at the cost of CVAT's keyboard speed and review stages. GeoLabel from DeadTrees is
+the browser-based, geo-native middle ground once [deadtrees-frontend#158](https://github.com/Deadwood-ai/deadtrees-frontend/issues/158)
+or a fork gives it pairs. The comparison tables behind this choice are on [terrain-viewer#19](https://github.com/Iconem/terrain-viewer/issues/19).
 
 ## Why TiTiler in the middle
 
@@ -52,6 +63,24 @@ into a PNG or GeoTIFF crop of an exact bounding box at an exact pixel size:
   image.
 - **GeoTIFF on demand.** `.tif` instead of `.png` embeds that geotransform, which is what labelme gets.
 - **Credentials stay server side.** TiTiler holds the bucket or WMTS credentials, the annotation tool only sees TiTiler URLs.
+
+## One compose stack
+
+`docker-compose.yml` in this folder starts TiTiler on 8010, the CVAT frame-name shim on 8020, Label Studio on 8081,
+and CVAT on 8085 by including CVAT's own compose file from a `cvat/` checkout next to it. `cvat.env` sets the
+Smokescreen flag and the host name, `docker-compose.override.yml` moves CVAT off port 8080.
+
+```sh
+git clone --depth 1 https://github.com/cvat-ai/cvat.git     # once
+docker compose up -d                                       # everything
+docker compose up -d titiler chip-shim label-studio        # without CVAT
+docker exec -e DJANGO_SUPERUSER_USERNAME=admin -e DJANGO_SUPERUSER_PASSWORD=... -e DJANGO_SUPERUSER_EMAIL=a@b.c cvat_server python3 /home/django/manage.py createsuperuser --noinput
+```
+
+GDAL source files go in `./data`, which is `/data` inside TiTiler. Inside the stack the services reach each other by
+name, so `sources.json` uses `http://titiler` for the server-side URLs and `http://chip-shim:8020` for the shim, and
+`http://127.0.0.1:8010` for what the browser and labelme fetch. The included CVAT file has been validated with
+`docker compose config`; the stack was exercised in this test with the same services started by hand on the same ports.
 
 ## Setup
 
@@ -193,16 +222,20 @@ LS_URL=... LS_API_KEY=...                 python cdtasks.py build labelstudio jo
 python cdtasks.py export cvat jobs.json -o merged.geojson --dissolve
 ```
 
-`sources.json` lists the dated sources and the TiTiler endpoints. A source is anything GDAL opens, with optional
-TiTiler params for rendering:
+`sources.json` lists the dated sources and the TiTiler endpoints. A source is anything GDAL opens: a COG, a local
+GeoTIFF, or a tile service described in a GDAL XML. `esri_tms18.xml` and `google_sat_tms.xml` are plain TMS
+descriptions, `bing_aerial_quadkey.xml` uses GDAL's VirtualEarth driver, which builds the quadkey from x, y and z.
+Basemap dates are nominal, the providers do not expose a capture date per tile, and their terms apply. A float raster
+such as a DSM takes a `params` entry, for example `rescale=80,200&colormap_name=terrain`:
 
 ```json
 {"titiler": {"servers": "http://host.docker.internal:8010", "local": "http://127.0.0.1:8010"},
  "cvat_shim": "http://host.docker.internal:8020",
  "classes": ["no-change", "destruction", "construction", "modification"],
  "sources": [
-   {"id": "esri_world_imagery",  "date": "2015-01-01", "url": "/data/esri_tms18.xml"},
-   {"id": "amphipolis_dsm_10cm", "date": "2024-05-01", "url": "https://.../dsm_cog.tif", "params": "rescale=80,200&colormap_name=terrain"},
+   {"id": "esri_world_imagery",  "date": "2016-01-01", "url": "/data/esri_tms18.xml"},
+   {"id": "google_satellite",    "date": "2019-01-01", "url": "/data/google_sat_tms.xml"},
+   {"id": "bing_aerial",         "date": "2021-01-01", "url": "/data/bing_aerial_quadkey.xml"},
    {"id": "amphipolis_rgb_10cm", "date": "2024-06-01", "url": "https://.../rgb_cog.tif"}]}
 ```
 
@@ -218,14 +251,20 @@ What `build` does per tool:
 - **Label Studio**: one project, one task per unit with before and after URLs and the cell geotransform in the task data.
 - **labelme**: one folder per cell with one GeoTIFF per date, A/D walks the dates, `cell.json` beside them.
 
+**Review in CVAT.** Nothing is created for review. Every job starts in the `annotation` stage with no assignee, and
+review is a stage change: `validation` for a reviewer, `acceptance` for sign-off, each with its own assignee. The
+jobs page filters by stage, and the reviewer gets the same canvas with issue markers. `cdtasks.py cvat-stage jobs.json --stage validation --assignee <user>`
+moves every job of a plan at once. For sampled review instead of full review, CVAT's quality control adds a ground
+truth job per task and scores annotators against it.
+
 What `export` does: pulls every task or project export through the API, or walks the labelme folders, applies each
 cell's geotransform, writes one GeoJSON in EPSG:3857 with class, drawn-on source, before and after ids and dates, and
 with `--dissolve` unions polygons that touch across cell overlaps when class and pair match.
 
-Tested on 2026-10-16 with the three sources above over a 1.4 km AOI at 50 cm GSD: 9 cells of 3 dates, 18 units, built
+Tested on 2026-10-16 with the four sources above over a 1.4 km AOI at 50 cm GSD: 9 cells of 4 dates, 27 units, built
 in all three tools, a test square placed on the overlap strip between two cells came back from every tool at the
 same coordinates, and the CVAT dissolve merged its two halves into one polygon. The single-AOI plan and the CVAT
-pairs layout were run the same day.
+pairs layout, three two-frame jobs over four dates, were run the same day, and `cvat-stage` moved the 9 jobs to validation.
 
 ## Which tool for which case
 
@@ -239,10 +278,11 @@ pairs layout were run the same day.
 | File | Purpose |
 |---|---|
 | `cdtasks.py` | The general tool: `plan` a grid of cells and pairs from sources, AOI and GSD, `build` it in CVAT, Label Studio or labelme, `export` and merge to GeoJSON |
-| `sources.json`, `jobs_single.json`, `jobs_grid.json` | The tested inputs and plans: one cell with two pairs, and the 3 x 3 grid at 50 cm GSD |
+| `sources.json`, `jobs_single.json`, `jobs_grid.json` | The tested inputs and plans: four dated sources, one cell with three pairs, and the 3 x 3 grid at 50 cm GSD |
+| `esri_tms18.xml`, `google_sat_tms.xml`, `bing_aerial_quadkey.xml` | Tile basemaps as GDAL sources, the templates for any XYZ, quadkey or WMTS input |
+| `docker-compose.yml`, `cvat.env`, `docker-compose.override.yml` | The stack: TiTiler, shim, Label Studio, CVAT included |
 | `make_pair.py` | Single pair worked example: viewport to bbox, geotransform and TiTiler URLs. Writes `pair.json` |
 | `pair.json` | The tested manifest, Amphipolis COG against Esri |
-| `esri_tms18.xml` | GDAL TMS description of Esri World Imagery, the template for any XYZ or WMTS source |
 | `labelstudio_task.py`, `labelstudio_config.xml`, `labelstudio_tasks.json` | Project, labeling config and task for Label Studio |
 | `cvat_task.py`, `chip_proxy.py` | Two-frame CVAT task from remote URLs, plus the frame-name shim |
 | `labelme_task.py` | GeoTIFF chips and `labels.txt` for labelme |

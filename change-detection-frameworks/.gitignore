@@ -6,3 +6,5 @@ state_*.json
 *.zip
 *.log
 lsdata/
+cvat/
+data/*.tif

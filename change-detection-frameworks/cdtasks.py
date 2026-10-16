@@ -5,6 +5,7 @@ over any number of dated raster sources, chipped by TiTiler, in CVAT, Label Stud
   python cdtasks.py plan  --sources sources.json --aoi 23.84,40.82,23.85,40.83 --aoi-crs EPSG:4326 --gsd 0.5 --chip 1024 --overlap 0.1 --pairs consecutive -o jobs.json
   python cdtasks.py build cvat|labelstudio|labelme jobs.json
   python cdtasks.py export cvat|labelstudio|labelme jobs.json -o merged.geojson [--dissolve]
+  python cdtasks.py cvat-stage jobs.json --stage validation --assignee reviewer   # hand the jobs to review
 
 sources.json:
   {"titiler": {"servers": "http://host.docker.internal:8010", "local": "http://127.0.0.1:8010"},
@@ -270,6 +271,26 @@ def cmd_export(a):
     pathlib.Path(a.out).write_text(json.dumps(gj, indent=1))
     print(f"{n} polygons" + (f", {len(feats)} after dissolve" if a.dissolve else "") + f" -> {a.out}")
 
+
+# ----------------------------------------------------------------------------- cvat review stages
+def cmd_cvat_stage(a):
+    """Move every job of the plan's CVAT tasks to a stage (annotation, validation, acceptance) and optionally assign it.
+    CVAT creates jobs in the annotation stage with no assignee; review is a stage change, nothing is created for it."""
+    from cvat_sdk import make_client
+    state = json.loads(pathlib.Path(a.state).read_text())["cvat"]
+    with make_client(os.environ.get("CVAT_URL", "http://localhost:8085"), credentials=(os.environ["CVAT_USER"], os.environ["CVAT_PASS"])) as client:
+        assignee = None
+        if a.assignee:
+            users = {u.username: u.id for u in client.users.list()}
+            if a.assignee not in users: sys.exit(f"no CVAT user {a.assignee!r}, have {sorted(users)}")
+            assignee = users[a.assignee]
+        for s in state:
+            for job in client.tasks.retrieve(s["task_id"]).get_jobs():
+                patch = {"stage": a.stage}
+                if assignee is not None: patch["assignee"] = assignee
+                if a.state_value: patch["state"] = a.state_value
+                job.update(patch); print(f"task {s['task_id']} job {job.id}: stage={a.stage}" + (f" assignee={a.assignee}" if a.assignee else ""))
+
 # ----------------------------------------------------------------------------- cli
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -285,6 +306,10 @@ def main():
     e = sub.add_parser("export"); e.add_argument("tool", choices=["cvat", "labelstudio", "labelme"]); e.add_argument("jobs")
     e.add_argument("-o", "--out", default="merged.geojson"); e.add_argument("--dissolve", action="store_true"); e.add_argument("--workdir", default="exports")
     e.add_argument("--state", default=None); e.set_defaults(func=cmd_export)
+    st = sub.add_parser("cvat-stage", help="move the plan's CVAT jobs to a review stage and assign them"); st.add_argument("jobs")
+    st.add_argument("--stage", choices=["annotation", "validation", "acceptance"], required=True); st.add_argument("--assignee", help="CVAT username")
+    st.add_argument("--state-value", choices=["new", "in progress", "rejected", "completed"], dest="state_value"); st.add_argument("--state", default=None)
+    st.set_defaults(func=cmd_cvat_stage, tool="cvat")
     a = ap.parse_args()
     if hasattr(a, "state") and a.state is None: a.state = f"state_{a.tool}.json"
     if a.cmd == "plan" and not (a.gsd or a.zoom): ap.error("--gsd or --zoom is required")
