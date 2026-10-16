@@ -279,7 +279,7 @@ pairs layout, three two-frame jobs over four dates, were run the same day, and `
 |---|---|
 | `cdtasks.py` | The general tool: `plan` a grid of cells and pairs from sources, AOI and GSD, `build` it in CVAT, Label Studio or labelme, `export` and merge to GeoJSON |
 | `sources.json`, `jobs_single.json`, `jobs_grid.json` | The tested inputs and plans: four dated sources, one cell with three pairs, and the 3 x 3 grid at 50 cm GSD |
-| `esri_tms18.xml`, `google_sat_tms.xml`, `bing_aerial_quadkey.xml` | Tile basemaps as GDAL sources, the templates for any XYZ, quadkey or WMTS input |
+| `data/esri_tms18.xml`, `data/google_sat_tms.xml`, `data/bing_aerial_quadkey.xml` | Tile basemaps as GDAL sources, the templates for any XYZ, quadkey or WMTS input |
 | `docker-compose.yml`, `cvat.env`, `docker-compose.override.yml` | The stack: TiTiler, shim, Label Studio, CVAT included |
 | `make_pair.py` | Single pair worked example: viewport to bbox, geotransform and TiTiler URLs. Writes `pair.json` |
 | `pair.json` | The tested manifest, Amphipolis COG against Esri |
