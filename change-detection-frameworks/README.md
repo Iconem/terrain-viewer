@@ -29,6 +29,16 @@ native and the data model yours, at the cost of CVAT's keyboard speed and review
 the browser-based, geo-native middle ground once [deadtrees-frontend#158](https://github.com/Deadwood-ai/deadtrees-frontend/issues/158)
 or a fork gives it pairs. The comparison tables behind this choice are on [terrain-viewer#19](https://github.com/Iconem/terrain-viewer/issues/19).
 
+QGIS plugins worth knowing for this route:
+
+- [QuickMapServices](https://nextgis.com/blog/quickmapservices/), the basemap catalogue, Esri, Google, Bing and many more as layers in one click, the same sources `data/*.xml` describe for TiTiler.
+- [Map Swipe Tool](https://github.com/lmotta/mapswipetool_plugin), a swipe divider between the active layer and the rest, the before/after comparison inside QGIS.
+- [Feature Iterator](https://gitlab.com/cigeoe/feature-iterator-qgis-plugin/tree/master), step through the features of a layer one by one, which turns a grid of cells into a task queue.
+- [send2map](https://wiki.iconem.com/images/research/gis/send2map_app.zip), Iconem's own, on the wiki.
+- [Load Them All](https://github.com/gacarrillor/loadthemall), bulk load every raster or vector under a folder, for a cell's stack of dated GeoTIFFs.
+- [qgis-mcp](https://github.com/nkarasiak/qgis-mcp), drive QGIS from an AI assistant over MCP.
+- Further out: [Lat Lon Tools](https://github.com/hamiltoncj/qgis-latlontools-plugin) for coordinate capture and conversion, and [QGIS Timelapse](https://github.com/opengeos/qgis-timelapse-plugin) for animating a dated stack.
+
 ## Why TiTiler in the middle
 
 The three tools take an image by URL, labelme takes a file. TiTiler's bbox endpoint turns any GDAL-readable source
