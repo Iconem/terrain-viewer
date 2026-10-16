@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ExternalLink, Moon, Sun } from 'lucide-react';
+import { ExternalLink, Moon, PanelRightClose, PanelRightOpen, Sun } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
@@ -77,6 +77,9 @@ export function App() {
   const [ui, setUi] = useState<UiState | null>(null);
   const [error, setError] = useState<string | null>(null);
   const { dark, toggle } = useDarkMode();
+  // The inspector can be folded away; the choice is remembered in this browser.
+  const [inspectorOpen, setInspectorOpen] = useState(() => localStorage.getItem('ux-flows-inspector') !== 'closed');
+  const toggleInspector = () => setInspectorOpen((o) => { localStorage.setItem('ux-flows-inspector', o ? 'closed' : 'open'); return !o; });
 
   useEffect(() => {
     const base = assetBase();
@@ -149,7 +152,12 @@ export function App() {
             <TabsList>{VIEWS.map(([v, label]) => <TabsTrigger key={v} value={v}>{label}</TabsTrigger>)}</TabsList>
           </Tabs>
           <span className="flex-1" />
-          <Button variant="ghost" size="icon-sm" onClick={toggle} aria-label={dark ? 'Light mode' : 'Dark mode'}>{dark ? <Sun /> : <Moon />}</Button>
+          <Button variant="ghost" size="icon-sm" onClick={toggle} aria-label={dark ? 'Light mode' : 'Dark mode'} title={dark ? 'Light mode' : 'Dark mode'}>{dark ? <Sun /> : <Moon />}</Button>
+          {ui.view === 'map' && (
+            <Button variant="ghost" size="icon-sm" className="hidden lg:inline-flex" onClick={toggleInspector} aria-label={inspectorOpen ? 'Hide the inspector' : 'Show the inspector'} title={inspectorOpen ? 'Hide the inspector' : 'Show the inspector'}>
+              {inspectorOpen ? <PanelRightClose /> : <PanelRightOpen />}
+            </Button>
+          )}
           <Button variant="ghost" size="sm" nativeButton={false} render={<a href={data.meta.base} target="_blank" rel="noreferrer" />}>
             Open Terrain Viewer <ExternalLink />
           </Button>
@@ -169,7 +177,7 @@ export function App() {
                 </div>
               )}
             </SidebarInset>
-            <Inspector data={data} nodeId={ui.node} flow={flow} currentStep={currentStep} onSetFlow={(id) => setFlow(id, true)} onSelect={selectNode} />
+            {inspectorOpen && <Inspector data={data} nodeId={ui.node} flow={flow} currentStep={currentStep} onSetFlow={(id) => setFlow(id, true)} onSelect={selectNode} onClose={toggleInspector} />}
           </SidebarProvider>
         ) : ui.view === 'canvas' ? (
           <Canvas data={data} selected={ui.node} onOpen={selectNode} />

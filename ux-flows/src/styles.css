@@ -27,3 +27,8 @@
 .arrow-label { font-size: 11px; fill: var(--foreground); paint-order: stroke; stroke: var(--background); stroke-width: 4px; stroke-linejoin: round; }
 .arrow-label.in { fill: #3b82f6; }
 .arrow-label.out { fill: #f59e0b; }
+
+/* Every interactive element shows a pointer, including shadcn's tabs, selects, sidebar items and toggles, which
+   ship with the default cursor; disabled ones go back to the arrow. */
+#root :is(button, a[href], [role='button'], [role='tab'], [role='option'], [role='combobox'], [role='treeitem'], [role='radio'], [role='switch'], summary, label[for], input[type='search']):not(:disabled, [aria-disabled='true'], [data-disabled]) { cursor: pointer; }
+#root input[type='search'] { cursor: text; }

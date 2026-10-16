@@ -1,12 +1,12 @@
 import { Fragment, useState } from 'react';
-import { ChevronRight, Maximize2 } from 'lucide-react';
+import { ChevronRight, Maximize2, PanelRightClose } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbSeparator } from '@/components/ui/breadcrumb';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
-import { Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent } from '@/components/ui/sidebar';
+import { Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarHeader } from '@/components/ui/sidebar';
 import type { Data, Flow, PathStep, Shot } from './model';
 import { ancestors } from './model';
 
@@ -132,8 +132,8 @@ function Meta({ rows }: { rows: [React.ReactNode, React.ReactNode][] }) {
 }
 const Code = ({ children }: { children: React.ReactNode }) => <code className="rounded bg-muted px-1 py-0.5 font-mono text-[11px] [overflow-wrap:anywhere]">{children}</code>;
 
-export function Inspector({ data, nodeId, flow, currentStep, onSetFlow, onSelect }: {
-  data: Data; nodeId: string | null; flow: Flow | null; currentStep: PathStep | null; onSetFlow: (id: string) => void; onSelect: (id: string) => void;
+export function Inspector({ data, nodeId, flow, currentStep, onSetFlow, onSelect, onClose }: {
+  data: Data; nodeId: string | null; flow: Flow | null; currentStep: PathStep | null; onSetFlow: (id: string) => void; onSelect: (id: string) => void; onClose: () => void;
 }) {
   const n = nodeId ? data.nodes[nodeId] : null;
   const params = n?.params ? Object.entries(n.params).filter(([k]) => !['viewMode', 'lat', 'lng', 'place'].includes(k)) : [];
@@ -145,6 +145,10 @@ export function Inspector({ data, nodeId, flow, currentStep, onSetFlow, onSelect
   );
   return (
     <Sidebar side="right" collapsible="none" className="hidden h-full min-h-0 shrink-0 border-l lg:flex" style={{ '--sidebar-width': '21rem' } as React.CSSProperties}>
+      <SidebarHeader className="flex-row items-center justify-between py-1.5 pl-3">
+        <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Inspector</span>
+        <Button variant="ghost" size="icon-sm" onClick={onClose} aria-label="Hide the inspector" title="Hide the inspector"><PanelRightClose /></Button>
+      </SidebarHeader>
       <SidebarContent>
         {n && (
           <>
