@@ -1,0 +1,6 @@
+chips/
+labelme_files/
+out/
+*.zip
+*.log
+lsdata/

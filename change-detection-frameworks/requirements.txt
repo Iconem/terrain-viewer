@@ -1,0 +1,4 @@
+requests
+rasterio
+label-studio-sdk
+cvat-sdk
