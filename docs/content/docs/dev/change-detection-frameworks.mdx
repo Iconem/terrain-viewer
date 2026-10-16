@@ -16,6 +16,13 @@ Tested on 2026-10-16 with the Amphipolis 10 cm RGB COG against Esri World Imager
 [terrain-viewer viewport](https://terrain-viewer.iconem.com/?zoom=18.4&lat=40.8227&lng=23.845) lng 23.845, lat 40.8227, zoom 18.4.
 Polygons drawn at the same pixels in the three tools convert to the same EPSG:3857 coordinates.
 
+## The tools, in the order we would pick them
+
+- **[CVAT](https://github.com/cvat-ai/cvat)**, web, self-hosted with Docker Compose. A pair is a two-frame job and F/D is an exact flicker, the whole workflow is keyboard driven, and jobs, assignees, review stages and quality reports come with the open-source build. The data model fits a dated series: frames in date order, a `drawn_on` attribute per polygon. Requests filed: [cvat#11296](https://github.com/cvat-ai/cvat/issues/11296) for georeferenced input and GeoJSON export, [cvat#11297](https://github.com/cvat-ai/cvat/issues/11297) for pair tasks.
+- **[labelme](https://github.com/wkentaro/labelme)**, desktop, `pip install labelme`. Opens the GeoTIFF chips directly, A/D flickers, batch labelling with `display_label_popup: false`. One analyst per folder, no jobs or review. Requests filed: a comment on [labelme#2209](https://github.com/wkentaro/labelme/issues/2209#issuecomment-6143351751) for GeoJSON export with the geotransform, [discussion 2763](https://github.com/wkentaro/labelme/discussions/2763) for tiled COG rendering and a compare image.
+- **[Label Studio](https://github.com/HumanSignal/label-studio)**, web, Docker or pip. The least suited for raster time series today: the two images are independent viewports with no synced pan and zoom, no flicker, no swipe. Its one advantage is that the task JSON carries the pair metadata natively, so it is the easiest to script around. Requests filed: [label-studio#9985](https://github.com/HumanSignal/label-studio/issues/9985) for georeference fields and a GeoJSON converter, [label-studio#9986](https://github.com/HumanSignal/label-studio/issues/9986) for synced viewports with swipe and flicker.
+- **[GeoLabel](https://github.com/Deadwood-ai/deadtrees-frontend)** from DeadTrees, the geo-native alternative: native COG rendering, polygons in PostGIS, auditor queue, row-level security, but one image per dataset and fixed classes. [deadtrees-frontend#158](https://github.com/Deadwood-ai/deadtrees-frontend/issues/158) asks for a generic change detection mode. Until then it is the fork candidate: pair table, second COG layer with flicker and swipe, configurable classes, a few days of work on a data model that is already most of the way there.
+
 ![Label Studio: before and after side by side, the test polygon on the after image](/screenshots/change-detection/label-studio-pair.jpg)
 
 ![CVAT: the after frame of the two-frame job, frame name encoding pair and side](/screenshots/change-detection/cvat-pair.jpg)
@@ -24,13 +31,6 @@ The two chips as served by TiTiler for the same bbox, Esri World Imagery through
 
 ![Before chip, Esri World Imagery via TiTiler](/screenshots/change-detection/chip-before-esri.jpg)
 ![After chip, Amphipolis 10 cm COG via TiTiler](/screenshots/change-detection/chip-after-cog.jpg)
-
-## The tools, in the order we would pick them
-
-- **[CVAT](https://github.com/cvat-ai/cvat)**, web, self-hosted with Docker Compose. A pair is a two-frame job and F/D is an exact flicker, the whole workflow is keyboard driven, and jobs, assignees, review stages and quality reports come with the open-source build. The data model fits a dated series: frames in date order, a `drawn_on` attribute per polygon. Requests filed: [cvat#11296](https://github.com/cvat-ai/cvat/issues/11296) for georeferenced input and GeoJSON export, [cvat#11297](https://github.com/cvat-ai/cvat/issues/11297) for pair tasks.
-- **[labelme](https://github.com/wkentaro/labelme)**, desktop, `pip install labelme`. Opens the GeoTIFF chips directly, A/D flickers, batch labelling with `display_label_popup: false`. One analyst per folder, no jobs or review. Requests filed: a comment on [labelme#2209](https://github.com/wkentaro/labelme/issues/2209#issuecomment-6143351751) for GeoJSON export with the geotransform, [discussion 2763](https://github.com/wkentaro/labelme/discussions/2763) for tiled COG rendering and a compare image.
-- **[Label Studio](https://github.com/HumanSignal/label-studio)**, web, Docker or pip. The least suited for raster time series today: the two images are independent viewports with no synced pan and zoom, no flicker, no swipe. Its one advantage is that the task JSON carries the pair metadata natively, so it is the easiest to script around. Requests filed: [label-studio#9985](https://github.com/HumanSignal/label-studio/issues/9985) for georeference fields and a GeoJSON converter, [label-studio#9986](https://github.com/HumanSignal/label-studio/issues/9986) for synced viewports with swipe and flicker.
-- **[GeoLabel](https://github.com/Deadwood-ai/deadtrees-frontend)** from DeadTrees, the geo-native alternative: native COG rendering, polygons in PostGIS, auditor queue, row-level security, but one image per dataset and fixed classes. [deadtrees-frontend#158](https://github.com/Deadwood-ai/deadtrees-frontend/issues/158) asks for a generic change detection mode. Until then it is the fork candidate: pair table, second COG layer with flicker and swipe, configurable classes, a few days of work on a data model that is already most of the way there.
 
 ## Why TiTiler in the middle
 
