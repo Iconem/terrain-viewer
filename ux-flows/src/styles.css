@@ -20,8 +20,8 @@ h2 { font: 600 12px/1.2 inherit; letter-spacing: .06em; text-transform: uppercas
 .ghost:hover, .nav:hover:not(:disabled) { background: var(--panel-2); }
 .primary { background: var(--accent); color: #fff; border-radius: 6px; padding: 6px 12px; font-weight: 600; }
 
-.app { height: 100vh; display: grid; grid-template-rows: 44px 1fr; }
-.top { display: flex; align-items: center; gap: 14px; padding: 0 14px; border-bottom: 1px solid var(--line); background: var(--panel); }
+.app { height: 100vh; display: grid; grid-template-rows: auto 1fr; overflow: hidden; }
+.top { display: flex; align-items: center; gap: 10px 14px; flex-wrap: wrap; min-height: 44px; padding: 6px 14px; border-bottom: 1px solid var(--line); background: var(--panel); }
 .brand { font-weight: 700; }
 .chip { font-size: 12px; color: var(--gold); border: 1px solid #5a4b22; background: #2a2416; padding: 3px 8px; border-radius: 6px; }
 .views { display: flex; gap: 4px; margin-left: 10px; }
@@ -29,10 +29,10 @@ h2 { font: 600 12px/1.2 inherit; letter-spacing: .06em; text-transform: uppercas
 .views button.on { color: var(--text); background: var(--panel-2); }
 
 /* Map view */
-.map { display: grid; grid-template-columns: 290px 1fr 340px; min-height: 0; }
+.map { display: grid; grid-template-columns: minmax(200px, 290px) minmax(0, 1fr) minmax(240px, 340px); min-height: 0; min-width: 0; }
 .sitemap, .inspector { background: var(--panel); border-color: var(--line); overflow: auto; min-height: 0; }
 .sitemap { border-right: 1px solid var(--line); }
-.inspector { border-left: 1px solid var(--line); padding: 10px 14px; }
+.inspector { border-left: 1px solid var(--line); padding: 10px 14px; min-width: 0; overflow-wrap: anywhere; }
 .pane-head { display: flex; align-items: center; gap: 8px; padding: 10px 12px; font-size: 11px; letter-spacing: .08em; color: var(--muted); }
 .pane-head input { flex: 1; background: var(--bg); border: 1px solid var(--line); color: var(--text); border-radius: 6px; padding: 4px 8px; font: inherit; }
 .sitemap ul { list-style: none; margin: 0; padding: 0; }
@@ -49,7 +49,7 @@ h2 { font: 600 12px/1.2 inherit; letter-spacing: .06em; text-transform: uppercas
 .dot.warn { background: var(--warn); } .dot.spec { background: var(--muted); }
 .legend { display: flex; flex-direction: column; gap: 4px; padding: 14px 12px; color: var(--muted); font-size: 12px; border-top: 1px solid var(--line); margin-top: 12px; }
 
-.centre { display: grid; grid-template-rows: 1fr auto; min-height: 0; min-width: 0; }
+.centre { display: grid; grid-template-rows: 1fr auto; grid-template-columns: minmax(0, 1fr); min-height: 0; min-width: 0; }
 .stage { overflow: auto; padding: 12px 20px; min-height: 0; }
 .crumbs { font-size: 12px; color: var(--muted); margin-bottom: 4px; }
 .stage-head { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
@@ -74,7 +74,8 @@ h2 { font: 600 12px/1.2 inherit; letter-spacing: .06em; text-transform: uppercas
 .lightbox .close { position: absolute; top: 12px; right: 16px; font-size: 28px; color: #fff; }
 
 .meta { display: grid; grid-template-columns: max-content 1fr; gap: 3px 10px; margin: 6px 0; font-size: 12px; }
-.meta dt { color: var(--muted); } .meta dd { margin: 0; overflow-wrap: anywhere; }
+.meta dt { color: var(--muted); } .meta dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+.meta code { white-space: normal; overflow-wrap: anywhere; }
 .inspector details { margin: 10px 0; } .inspector summary { cursor: pointer; font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
 .flow-card { display: block; width: 100%; text-align: left; padding: 8px 10px; border: 1px solid var(--line); border-radius: 6px; margin: 6px 0; background: var(--panel-2); }
 .flow-card.on { border-color: var(--accent); background: #1f2a3d; }
@@ -84,7 +85,8 @@ h2 { font: 600 12px/1.2 inherit; letter-spacing: .06em; text-transform: uppercas
 /* Player */
 .player { border-top: 1px solid var(--line); background: var(--panel); padding: 8px 12px 10px; }
 .player-empty { border-top: 1px solid var(--line); padding: 10px 14px; color: var(--muted); }
-.player-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }
+.player-head { display: flex; align-items: center; gap: 8px 10px; flex-wrap: wrap; margin-bottom: 8px; min-width: 0; }
+.title-pick { max-width: 100%; }
 .nav { width: 28px; height: 28px; border-radius: 14px; border: 1px solid var(--line); font-size: 18px; line-height: 1; }
 .nav:disabled { opacity: .35; cursor: default; }
 .title-pick { background: transparent; color: var(--text); border: 0; font: 600 15px/1.2 inherit; cursor: pointer; }
@@ -105,7 +107,7 @@ h2 { font: 600 12px/1.2 inherit; letter-spacing: .06em; text-transform: uppercas
 .thumb .cap b { color: var(--accent-2); }
 
 /* Flows view */
-.flows { display: grid; grid-template-columns: 300px 1fr; min-height: 0; overflow: auto; background: #f4f6f9; color: #1a2230; }
+.flows { display: grid; grid-template-columns: minmax(220px, 300px) minmax(0, 1fr); min-height: 0; overflow: auto; background: #f4f6f9; color: #1a2230; }
 .flow-list { padding: 24px; border-right: 1px solid #d9dee6; }
 .flow-list .flow-card { background: #fff; border-color: #d9dee6; color: #1a2230; }
 .flow-list .flow-card.on { border-color: var(--accent); background: #e8f0fe; }
@@ -172,3 +174,14 @@ h2 { font: 600 12px/1.2 inherit; letter-spacing: .06em; text-transform: uppercas
 .ccard .meta { font-size: 12px; } .ccard p { margin: 0; }
 
 .loading.error { color: var(--bad); max-width: 70ch; }
+
+/* Narrow windows: the sitemap and the inspector become rows the page scrolls through instead of columns it cannot fit. */
+@media (max-width: 980px) {
+  .app { height: auto; min-height: 100vh; overflow: visible; }
+  .map { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto auto; }
+  .sitemap { border-right: 0; border-bottom: 1px solid var(--line); max-height: 40vh; }
+  .inspector { border-left: 0; border-top: 1px solid var(--line); }
+  .centre { grid-template-rows: auto auto; }
+  .flows { grid-template-columns: minmax(0, 1fr); }
+  .flow-list { border-right: 0; border-bottom: 1px solid #d9dee6; }
+}

@@ -94,16 +94,16 @@ export function Inspector({ data, nodeId, flow, currentStep, onSetFlow, onSelect
   const interesting = params.filter(([k]) => !['viewMode', 'lat', 'lng', 'place'].includes(k));
   return (
     <aside className="inspector">
-      <section>
-        <h2>About</h2>
+      <details open>
+        <summary>About</summary>
         {n.how && <p>{n.how}</p>}
         {n.summary && <p>{n.summary}</p>}
         <dl className="meta">
           <dt>Map ID</dt><dd><code>{n.id}</code></dd>
-          {n.screens?.[0] && <><dt>Screenshot</dt><dd><code>{n.screens[0].src}</code></dd></>}
+          {n.screens?.[0] && <><dt>Screenshot</dt><dd><a href={n.screens[0].src} target="_blank" rel="noreferrer"><code>{n.screens[0].src.replace(/^.*\//, '')}</code></a></dd></>}
           {n.url && <><dt>Viewer URL</dt><dd><a href={n.url} target="_blank" rel="noreferrer">open this state ↗</a></dd></>}
         </dl>
-      </section>
+      </details>
       {interesting.length > 0 && (
         <details open>
           <summary>URL state <span className="count">{interesting.length}</span></summary>
