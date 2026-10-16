@@ -13,6 +13,13 @@ Tested on 2026-10-16 with the Amphipolis 10 cm RGB COG against Esri World Imager
 [terrain-viewer viewport](https://terrain-viewer.iconem.com/?zoom=18.4&lat=40.8227&lng=23.845) lng 23.845, lat 40.8227, zoom 18.4.
 Polygons drawn at the same pixels in the three tools convert to the same EPSG:3857 coordinates.
 
+## The tools, in the order we would pick them
+
+- **[CVAT](https://github.com/cvat-ai/cvat)**, web, self-hosted with Docker Compose. A pair is a two-frame job and F/D is an exact flicker, the whole workflow is keyboard driven, and jobs, assignees, review stages and quality reports come with the open-source build. The data model fits a dated series: frames in date order, a `drawn_on` attribute per polygon. Requests filed: [cvat#11296](https://github.com/cvat-ai/cvat/issues/11296) for georeferenced input and GeoJSON export, [cvat#11297](https://github.com/cvat-ai/cvat/issues/11297) for pair tasks.
+- **[labelme](https://github.com/wkentaro/labelme)**, desktop, `pip install labelme`. Opens the GeoTIFF chips directly, A/D flickers, batch labelling with `display_label_popup: false`. One analyst per folder, no jobs or review. Requests filed: a comment on [labelme#2209](https://github.com/wkentaro/labelme/issues/2209#issuecomment-6143351751) for GeoJSON export with the geotransform, [discussion 2763](https://github.com/wkentaro/labelme/discussions/2763) for tiled COG rendering and a compare image.
+- **[Label Studio](https://github.com/HumanSignal/label-studio)**, web, Docker or pip. The least suited for raster time series today: the two images are independent viewports with no synced pan and zoom, no flicker, no swipe. Its one advantage is that the task JSON carries the pair metadata natively, so it is the easiest to script around. Requests filed: [label-studio#9985](https://github.com/HumanSignal/label-studio/issues/9985) for georeference fields and a GeoJSON converter, [label-studio#9986](https://github.com/HumanSignal/label-studio/issues/9986) for synced viewports with swipe and flicker.
+- **[GeoLabel](https://github.com/Deadwood-ai/deadtrees-frontend)** from DeadTrees, the geo-native alternative: native COG rendering, polygons in PostGIS, auditor queue, row-level security, but one image per dataset and fixed classes. [deadtrees-frontend#158](https://github.com/Deadwood-ai/deadtrees-frontend/issues/158) asks for a generic change detection mode. Until then it is the fork candidate: pair table, second COG layer with flicker and swipe, configurable classes, a few days of work on a data model that is already most of the way there.
+
 ## Why TiTiler in the middle
 
 The three tools take an image by URL, labelme takes a file. TiTiler's bbox endpoint turns any GDAL-readable source
@@ -85,15 +92,6 @@ converter applies the full affine, so a source served in its native rotated geom
 
 ## Data model of each service, and how the pair maps onto it
 
-### Label Studio
-
-- **Unit of work**: a task. Task `data` is free JSON, so it carries the pair id, both image ids, both dates and the geotransform verbatim.
-- **Labeling config**: two `<Image>` tags, `before` and `after`, each with its own `<PolygonLabels>` holding the four classes. Which image a polygon was drawn on is therefore implicit in the region's `to_name`. See `labelstudio_config.xml`.
-- **Images**: loaded by the browser from the URL. The TiTiler host must be reachable from the analyst's machine and send CORS headers, which TiTiler does by default.
-- **View**: side by side, independent zoom and pan. No flicker, no swipe. Requested in [label-studio#9986](https://github.com/HumanSignal/label-studio/issues/9986).
-- **Export**: JSON. Polygon points are percentages of the image. The converter multiplies by chip size and applies the geotransform. Native GeoJSON requested in [label-studio#9985](https://github.com/HumanSignal/label-studio/issues/9985).
-- **Assignment and review**: basic in the community edition, review stages are Enterprise.
-
 ### CVAT
 
 - **Unit of work**: a task of frames, split into jobs. A pair is a two-frame task, or a two-frame segment of a longer series.
@@ -112,13 +110,22 @@ converter applies the full affine, so a source served in its native rotated geom
 - **Export**: labelme JSON, pixel coordinates. The converter reads the geotransform from the manifest. Native GeoJSON requested in [labelme#2209](https://github.com/wkentaro/labelme/issues/2209), tiled COG and compare image in [discussion #2763](https://github.com/wkentaro/labelme/discussions/2763).
 - **Assignment and review**: none, one analyst per folder.
 
+### Label Studio
+
+- **Unit of work**: a task. Task `data` is free JSON, so it carries the pair id, both image ids, both dates and the geotransform verbatim.
+- **Labeling config**: two `<Image>` tags, `before` and `after`, each with its own `<PolygonLabels>` holding the four classes. Which image a polygon was drawn on is therefore implicit in the region's `to_name`. See `labelstudio_config.xml`.
+- **Images**: loaded by the browser from the URL. The TiTiler host must be reachable from the analyst's machine and send CORS headers, which TiTiler does by default.
+- **View**: side by side, independent zoom and pan. No flicker, no swipe. Requested in [label-studio#9986](https://github.com/HumanSignal/label-studio/issues/9986).
+- **Export**: JSON. Polygon points are percentages of the image. The converter multiplies by chip size and applies the geotransform. Native GeoJSON requested in [label-studio#9985](https://github.com/HumanSignal/label-studio/issues/9985).
+- **Assignment and review**: basic in the community edition, review stages are Enterprise.
+
 ## Workarounds, and why each exists
 
 - **CVAT frame naming.** Every TiTiler bbox URL ends in `1024x1024.png`, so two chips in one task collide. `chip_proxy.py` is a pass-through that gives each chip a distinct path and forwards to TiTiler. In production, the same rewrite belongs in nginx or Caddy in front of TiTiler.
 - **CVAT private hosts.** CVAT fetches URLs through Smokescreen, which refuses private IP ranges. For a TiTiler on the same machine or LAN set `SMOKESCREEN_OPTS=--unsafe-allow-private-ranges`, or give TiTiler a public hostname.
 - **CVAT hostname.** The default compose routes on `Host: localhost`. Open it as `localhost`, not `127.0.0.1`. A first page load right after login can show "Authentication credentials were not provided" while the session cookie settles, a reload fixes it.
 - **Label Studio tokens.** 1.23 disables legacy API tokens per organisation. Enable them once with `POST /api/jwt/settings` or use a personal access token from the UI.
-- **Label Studio images.** Loaded by the browser, so a browser extension or a strict tracking setting can block the cross-origin image even when the server is fine. Open the image URL in a tab first when something does not render.
+- **Label Studio images.** Loaded by the browser, not the server. Some browsers refuse the image when the page and the image use different loopback host names, `localhost:8081` against `127.0.0.1:8010` failed, `localhost` for both worked. Use one host name for Label Studio and TiTiler, and open the image URL in a tab first when something does not render.
 - **labelme 7.** `--nodata` and `--autosave` are gone because both are defaults. Run `python -m labelme` when the Scripts directory is not on PATH. Never name a sibling folder `labelme`, Python imports it instead of the package.
 - **Esri as a date.** The Esri export endpoint caps the scale, so the basemap is read through a GDAL TMS XML with a tile cache. Real tiles stop at zoom 18 over Amphipolis.
 
@@ -157,8 +164,8 @@ cell overlaps when they share class and pair.
 ## Which tool for which case
 
 - Several annotators, review stages, exact pair flicker: CVAT with the frame-name shim and a `drawn_on` attribute.
-- Rich per-task metadata, side by side acceptable, fastest to set up: Label Studio.
 - One analyst, offline or on a laptop, imagery already as GeoTIFF: labelme.
+- Scripted pipelines where the pair metadata must ride along in the task itself, and side by side without sync is acceptable: Label Studio.
 - A geo-native alternative that would need a fork for pairs: GeoLabel from DeadTrees, see [deadtrees-frontend#158](https://github.com/Deadwood-ai/deadtrees-frontend/issues/158).
 
 ## Files
