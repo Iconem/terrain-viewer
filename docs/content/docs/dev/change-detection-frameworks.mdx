@@ -141,9 +141,9 @@ converter applies the full affine, so a source served in its native rotated geom
 - **labelme 7.** `--nodata` and `--autosave` are gone because both are defaults. Run `python -m labelme` when the Scripts directory is not on PATH. Never name a sibling folder `labelme`, Python imports it instead of the package.
 - **Esri as a date.** The Esri export endpoint caps the scale, so the basemap is read through a GDAL TMS XML with a tile cache. Real tiles stop at zoom 18 over Amphipolis.
 
-## From one pair to many: gridding a large raster and a long series
+## Gridding a large raster and a long series, the reasoning behind `cdtasks.py`
 
-Nothing in the recipe changes, only the manifest grows. Extrapolated from the one-pair test, not yet run at this size.
+Nothing in the recipe changes, only the manifest grows. Implemented in `cdtasks.py` below and run on a 3 x 3 grid at three dates; the 10k x 10k at ten dates figures are extrapolated from that.
 
 **Grid.** Cut the area of interest into cells the annotator can work with. At 1024 px a 10k x 10k raster is a
 10 x 10 grid, 100 cells. Overlap cells by 5 to 10 percent so a feature on a boundary is seen whole in at least one
@@ -173,6 +173,60 @@ creation: 100 tasks x 10 frames x 1024 px is about 2 GB of PNG on its volume.
 PostGIS with cell id, pair id, class, drawn-on date and both image ids as columns. Dissolve polygons that touch across
 cell overlaps when they share class and pair.
 
+## From one pair to many with `cdtasks.py`
+
+The single-pair scripts above are the worked example. `cdtasks.py` is the general tool: any number of dated sources,
+an area of interest, a target ground sample distance, and it plans the grid, builds the work in the chosen tool and
+merges the exports back. An AOI smaller than one chip gives a single cell, so one pair and a thousand pairs are the
+same three commands.
+
+```sh
+# 1. plan: sources + AOI + GSD -> jobs.json (cells with geotransforms, units = cell x pair, chip URLs per date)
+python cdtasks.py plan --sources sources.json --aoi 23.838,40.817,23.852,40.828 --aoi-crs EPSG:4326        --gsd 0.5 --chip 1024 --overlap 0.1 --pairs consecutive --name amph -o jobs.json
+
+# 2. build the work in one tool
+CVAT_URL=... CVAT_USER=... CVAT_PASS=... python cdtasks.py build cvat jobs.json --layout series   # or --layout pairs
+LS_URL=... LS_API_KEY=...                 python cdtasks.py build labelstudio jobs.json
+                                          python cdtasks.py build labelme jobs.json --labelme-dir labelme_files
+
+# 3. pull every export, georeference, merge, dissolve across cell overlaps
+python cdtasks.py export cvat jobs.json -o merged.geojson --dissolve
+```
+
+`sources.json` lists the dated sources and the TiTiler endpoints. A source is anything GDAL opens, with optional
+TiTiler params for rendering:
+
+```json
+{"titiler": {"servers": "http://host.docker.internal:8010", "local": "http://127.0.0.1:8010"},
+ "cvat_shim": "http://host.docker.internal:8020",
+ "classes": ["no-change", "destruction", "construction", "modification"],
+ "sources": [
+   {"id": "esri_world_imagery",  "date": "2015-01-01", "url": "/data/esri_tms18.xml"},
+   {"id": "amphipolis_dsm_10cm", "date": "2024-05-01", "url": "https://.../dsm_cog.tif", "params": "rescale=80,200&colormap_name=terrain"},
+   {"id": "amphipolis_rgb_10cm", "date": "2024-06-01", "url": "https://.../rgb_cog.tif"}]}
+```
+
+What `plan` decides:
+
+- **Pixel size.** The requested GSD is a ground distance. Chips are cut in EPSG:3857, whose metre is shorter than a ground metre by `cos(latitude)`, so the Web Mercator pixel size is `gsd / cos(lat)`. At Amphipolis 0.5 m of ground is 0.661 map units, and a 1024 px chip covers 677 m on the ground.
+- **Grid.** Cells of `chip` pixels stepping by `chip * (1 - overlap)`, enough rows and columns to cover the AOI, origin at the AOI's top left. Each cell gets its own geotransform.
+- **Units.** `consecutive` gives n-1 pairs per cell for n dates, `all` gives every combination, or list explicit `before:after` pairs by source id.
+
+What `build` does per tool:
+
+- **CVAT, `--layout series`**: one task per cell, the dates as frames in order, one job holding the whole series. F/D flickers along the timeline, the `drawn_on` attribute names the date a polygon belongs to. `--layout pairs`: the frame list becomes 1,2,2,3,3,4 with `segment_size=2`, so every job is a true consecutive pair. Frame names encode cell, date index, date and source id, which is how `export` finds the cell and the pair again.
+- **Label Studio**: one project, one task per unit with before and after URLs and the cell geotransform in the task data.
+- **labelme**: one folder per cell with one GeoTIFF per date, A/D walks the dates, `cell.json` beside them.
+
+What `export` does: pulls every task or project export through the API, or walks the labelme folders, applies each
+cell's geotransform, writes one GeoJSON in EPSG:3857 with class, drawn-on source, before and after ids and dates, and
+with `--dissolve` unions polygons that touch across cell overlaps when class and pair match.
+
+Tested on 2026-10-16 with the three sources above over a 1.4 km AOI at 50 cm GSD: 9 cells of 3 dates, 18 units, built
+in all three tools, a test square placed on the overlap strip between two cells came back from every tool at the
+same coordinates, and the CVAT dissolve merged its two halves into one polygon. The single-AOI plan and the CVAT
+pairs layout were run the same day.
+
 ## Which tool for which case
 
 - Several annotators, review stages, exact pair flicker: CVAT with the frame-name shim and a `drawn_on` attribute.
@@ -184,7 +238,9 @@ cell overlaps when they share class and pair.
 
 | File | Purpose |
 |---|---|
-| `make_pair.py` | Viewport to bbox, geotransform and TiTiler URLs. Writes `pair.json` |
+| `cdtasks.py` | The general tool: `plan` a grid of cells and pairs from sources, AOI and GSD, `build` it in CVAT, Label Studio or labelme, `export` and merge to GeoJSON |
+| `sources.json`, `jobs_single.json`, `jobs_grid.json` | The tested inputs and plans: one cell with two pairs, and the 3 x 3 grid at 50 cm GSD |
+| `make_pair.py` | Single pair worked example: viewport to bbox, geotransform and TiTiler URLs. Writes `pair.json` |
 | `pair.json` | The tested manifest, Amphipolis COG against Esri |
 | `esri_tms18.xml` | GDAL TMS description of Esri World Imagery, the template for any XYZ or WMTS source |
 | `labelstudio_task.py`, `labelstudio_config.xml`, `labelstudio_tasks.json` | Project, labeling config and task for Label Studio |
