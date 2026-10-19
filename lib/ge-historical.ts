@@ -70,12 +70,21 @@ const LOCAL_DATES_DEBOUNCE_MS = 400
 /** Real per-location capture dates from Google's own IMAGERY_HISTORY layer
  *  for the Keyhole tile at (latitude, longitude, zoom) — not synthetic,
  *  unlike lib/hls.ts's placeholder ticks. */
-export function useGeHistoricalDates(latitudeRaw: number, longitudeRaw: number, zoomRaw: number): { items: { dateMs: number; label: string }[]; loading: boolean } {
+export function useGeHistoricalDates(latitudeRaw: number, longitudeRaw: number, zoomRaw: number): { items: { dateMs: number; label: string }[]; coarserDates: Set<number>; loading: boolean } {
   // Quarter-tile input quantization — same "don't re-query center metadata
   // for a move too small to change it" reasoning as lib/wayback.ts's
   // quantizeLocation (see its comment).
   const { latitude, longitude, zoom } = quantizeLocation(latitudeRaw, longitudeRaw, zoomRaw)
   const [items, setItems] = useState<{ dateMs: number; label: string }[]>([])
+  // The dates the ancestors of this node list and this node does not: a
+  // selected date found only there means the view zoomed in past the
+  // imagery's own levels (the protocol would climb to it and upscale), which
+  // is when the timeline snaps the date to this level's newest capture on or
+  // before it. A date listed nowhere up the chain (a sharp capture, seen from
+  // a coarse zoom) is kept, and the protocol draws the newest mosaic on or
+  // before it. The ancestors' packets were loaded by the walk to this node,
+  // so reading them costs no request.
+  const [coarserDates, setCoarserDates] = useState<Set<number>>(() => new Set())
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -98,7 +107,19 @@ export function useGeHistoricalDates(latitudeRaw: number, longitudeRaw: number, 
             label: `${d.year}-${String(d.month).padStart(2, "0")}-${String(d.day).padStart(2, "0")}`,
           }))
           .sort((a: any, b: any) => a.dateMs - b.dateMs)
+        const own = new Set(mapped.map((d: { dateMs: number }) => d.dateMs))
+        const above = new Set<number>()
+        for (let up = 1; path.length - up >= 2; up++) {
+          const anc = await ge.getDatesForPath(path.slice(0, path.length - up))
+          for (const d of anc as any[]) {
+            if (!d.packed) continue
+            const ms = Date.UTC(d.year, d.month - 1, d.day)
+            if (!own.has(ms)) above.add(ms)
+          }
+        }
+        if (cancelled) return
         setItems(mapped)
+        setCoarserDates(above)
         setLoading(false)
       } catch {
         if (!cancelled) setLoading(false)
@@ -107,7 +128,7 @@ export function useGeHistoricalDates(latitudeRaw: number, longitudeRaw: number, 
     return () => { cancelled = true; clearTimeout(timer) }
   }, [latitude, longitude, zoom])
 
-  return { items, loading }
+  return { items, coarserDates, loading }
 }
 
 /**

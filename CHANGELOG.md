@@ -1,3 +1,17 @@
+# Changelog — Google Earth Dates Follow the Zoom
+
+<!-- released: 2026-10-19 -->
+
+#### TL;DR
+
+- **The app**: a Google Earth Historical view zoomed in from a yearly Landsat mosaic now moves its date to the sharp capture drawn, instead of upscaling the mosaic.
+- **The docs**: a note on vertical references atop Terrain Sources (orthometric heights everywhere, the ellipsoid conversion from cesium-mapterhorn-provider), and a section on which Google Earth date is drawn as you zoom.
+
+#### Details
+
+- Google Earth Historical: the date lists are per tile and per level, yearly Landsat / Copernicus mosaics at low zooms, the sharp captures from about level 14. The tiles still draw the exact date, climbing to a coarser node when this level does not list it, so a mosaic picked at a low zoom was upscaled on zooming in with sharp captures a tick away. Once the camera settles, a date listed only by an ancestor moves to this level's newest capture on or before it, Google Earth's own "as of" rule; a sharp capture's date is kept at low zooms, where the tiles show the newest mosaic on or before it and the handle sits on that mosaic's tick, so repeated zooms never drift. The handle of a Google Earth view sits on the newest tick on or before its date rather than the nearest.
+- Terrain Sources: a note that every built-in DEM is orthometric, how far the WGS84 ellipsoid sits from it, where the offset bites (ellipsoidal sources in a Difference), and Bert Temme's EGM2008 conversion in cesium-mapterhorn-provider PR 3 as the reference method. The Esri World Elevation section had been nested inside the Sources Coverage callout; it stands on its own again.
+
 # Changelog — Shadows on Terrain, the Docs Home and Demo Videos
 
 <!-- released: 2026-10-15 -->

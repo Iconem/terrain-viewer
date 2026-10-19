@@ -163,8 +163,32 @@ There's no imperative `setDate()` call — `geHistoricalTileSource(dateMs)` call
 
 **Registries.** `ge-historical` is registered into `HISTORICAL_BASEMAP_IDS` (`lib/historical-sources.ts`) and `EXPORT_SOURCE_IDS` (`lib/historical-export-sources.ts`), so `listExportTicks("ge-historical", ...)` can call the same `listGeHistoricalTicksInRange`/`geHistoricalTileSource` pair the live map uses to feed batch export (`lib/export-multi.ts`) without a mounted component.
 
+## Which date is drawn as you zoom
+
+A node's date list belongs to its level. Over the Sharjah coast at Al Hamriyah the coarse nodes list only the yearly Landsat / Copernicus mosaics, and from level 14 the list is the sharp captures, with a single mosaic still hanging on (read with `getDatesForPath` on 2026-10-19):
+
+| Level | Dates listed | Providers |
+|---|---|---|
+| 6 to 13 | 37, one per year 1984 to 2020, each dated 31 December | Landsat / Copernicus |
+| 14 | 47 | Maxar 39, Airbus 5, CNES / Airbus 2, Landsat / Copernicus 1 (1985) |
+| 15 to 18 | 39 to 41 | Maxar, Airbus, CNES / Airbus |
+| 19 | 36 | the same, the oldest Maxar captures gone |
+
+So a date picked on the timeline at one zoom is often absent from the node at another, and two rules decide what happens.
+
+**The tiles keep the date honest.** `_pickTileForPath` draws the node's own capture of exactly the set date; failing that, the nearest ancestor's capture of that date, cropped and upscaled; and only when no node up to the root lists the date, the newest capture on or before it at this level (with nothing that old, the oldest). Nothing newer than the slider is ever drawn. An earlier "nearest date" pick had the view drift onto 2012 imagery while the slider said 2010.
+
+**The timeline moves the date to what is drawn.** With that rule alone, a mosaic picked at a low zoom stayed blurry on zooming in: the exact 31 December date was found on an ancestor and upscaled, while sharp captures of the same year sat a tick away. Once the dates of the settled camera are in, `historical-timeline-panel.tsx` adjusts each Google Earth view's date, Google Earth's own "as of" behaviour:
+
+- listed at this level: kept, the capture covers the view centre;
+- listed only by an ancestor, so the view zoomed in past the imagery's levels: the newest capture on or before it here, or with nothing that old the oldest one, the same choice the tiles make;
+- listed nowhere up the chain, a sharp capture seen from a coarse zoom or a typed date: kept. The tiles meanwhile show the newest mosaic on or before it, and the handle sits on that mosaic's tick; zooming back in returns to the capture, so repeated zooms never drift;
+- past the newest capture here (a link saying "today"): that newest capture.
+
+The hook `useGeHistoricalDates` returns the ancestors' dates beside the node's own for this; the ancestors' packets were loaded by the walk, so it costs no request. Neighbouring tiles that do not list the chosen capture still climb to an ancestor and draw soft, which the handle's date then explains: the capture does not cover the whole view.
+
 ## Limitations
 
-- Coverage is sparse and mostly appears at higher zooms — "no dated history" for a tile is a coverage signal, not an error.
+- Coverage is sparse and mostly appears at higher zooms — "no dated history" for a tile is a coverage signal, not an error. At low zooms the ticks are the yearly Landsat / Copernicus mosaics, see above.
 - Vertical reprojection (WGS84-square → Web-Mercator) scales linearly within a tile — sub-pixel error at high zoom.
 - Google's endpoints are undocumented and may change without notice; request shapes mirror GEHistoricalImagery's.
