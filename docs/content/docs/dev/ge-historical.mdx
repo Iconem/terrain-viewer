@@ -185,7 +185,7 @@ So a date picked on the timeline at one zoom is often absent from the node at an
 - listed nowhere up the chain, a sharp capture seen from a coarse zoom or a typed date: kept. The tiles meanwhile show the newest mosaic on or before it, and the handle sits on that mosaic's tick; zooming back in returns to the capture, so repeated zooms never drift;
 - past the newest capture here (a link saying "today"): that newest capture.
 
-The hook `useGeHistoricalDates` returns the ancestors' dates beside the node's own for this; the ancestors' packets were loaded by the walk, so it costs no request. Neighbouring tiles that do not list the chosen capture still climb to an ancestor and draw soft, which the handle's date then explains: the capture does not cover the whole view.
+The hook `useGeHistoricalDates` returns the ancestors' dates beside the node's own for this; the ancestors' packets were loaded by the walk, so it costs no request. It reads the node at the level the tiles on screen are built from, not at the viewport zoom: MapLibre requests tile zoom round(zoom) + 1 for a 256 px raster source, and the HiDPI build below takes one level more, so at viewport zoom 12 the list is level 14's. Read at the viewport zoom, the timeline kept the mosaics' ticks while the tiles were already the sharp captures, and the snap came two zooms late. Neighbouring tiles that do not list the chosen capture still climb to an ancestor and draw soft, which the handle's date then explains: the capture does not cover the whole view.
 
 ## Tile resolution: level z or z + 1
 
