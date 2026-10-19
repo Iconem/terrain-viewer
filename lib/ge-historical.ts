@@ -35,10 +35,13 @@ function getGe() {
   return geInstance
 }
 
-export function geHistoricalTileSource(dateMs: number): { tiles: string[]; tileSize: number; maxzoom: number; attribution: string } {
+/** `hd`: 512 px tiles built from Keyhole level z + 1 (Settings → Streaming,
+ *  geHiDpiTilesAtom), see _buildMercatorTile in the library. The flag rides
+ *  in the tile URL, so toggling it changes `tiles` and MapLibre refetches. */
+export function geHistoricalTileSource(dateMs: number, hd = false): { tiles: string[]; tileSize: number; maxzoom: number; attribution: string } {
   const ge = getGe()
   const d = new Date(dateMs)
-  const spec = ge.makeRasterSource({ year: d.getUTCFullYear(), month: d.getUTCMonth() + 1, day: d.getUTCDate() })
+  const spec = ge.makeRasterSource({ year: d.getUTCFullYear(), month: d.getUTCMonth() + 1, day: d.getUTCDate() }, { hd })
   // A constant pointer, not makeRasterSource's own generic "Imagery ©
   // Google" — the REAL per-tile provider (e.g. "Google Earth - CNES /
   // Airbus", resolved from Google's own dbRoot, see
@@ -54,7 +57,8 @@ export function geHistoricalTileSource(dateMs: number): { tiles: string[]; tileS
  *  same path the gehist:// protocol handler takes, minus MapLibre. For the
  *  Export Multi mosaic, which cannot fetch() a custom scheme. Throws when
  *  Google has no tile for that date/level, so the caller's zoom step-down
- *  can try a coarser level rather than writing a transparent frame. */
+ *  can try a coarser level rather than writing a transparent frame. Always
+ *  the 256 px build: the mosaic lays tiles out at that size. */
 export async function fetchGeHistoricalTileBlob(z: number, x: number, y: number, dateMs: number, signal?: AbortSignal): Promise<Blob> {
   const ge = getGe()
   const d = new Date(dateMs)
