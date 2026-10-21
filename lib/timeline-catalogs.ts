@@ -110,7 +110,7 @@ const NAT_PLACE: Record<string, [string, string]> = {
   "cat-nat-dc": ["North America", "USA"], "cat-nat-massgis": ["North America", "USA"], "cat-nat-ctecco": ["North America", "USA"], "cat-nat-iowa": ["North America", "USA"],
   "cat-nat-chicagoland": ["North America", "USA"], "cat-nat-minnesota": ["North America", "USA"], "cat-nat-chatham": ["North America", "USA"], "cat-nat-florida1940": ["North America", "USA"],
   "cat-nat-saopaulo": ["South America", "BRA"],
-  "cat-nat-weld": ["World", "WLD"],
+  "cat-nat-weld": ["World", "WLD"], "cat-nat-gtimelapse": ["World", "WLD"],
 }
 const COUNTRY_ISO: Record<string, string> = { Austria: "AUT", Belgium: "BEL", Germany: "DEU", Italy: "ITA", France: "FRA", Switzerland: "CHE", Netherlands: "NLD", Luxembourg: "LUX", Spain: "ESP", Portugal: "PRT", Norway: "NOR", Japan: "JPN", Taiwan: "TWN", Australia: "AUS", Canada: "CAN", Brazil: "BRA", Slovenia: "SVN", Lithuania: "LTU", Cyprus: "CYP", Slovakia: "SVK" }
 const natPlace = (s: { id: string; group: string }): { continent: string; iso3: string } => {
@@ -807,6 +807,7 @@ async function nationalTicks(src: NatSource, bbox: Bbox, signal?: AbortSignal): 
   if (src.dates) dates = await src.dates(cx, cy, signal).catch(() => null)
   let kept: NatLayer[]
   if (dates) kept = candidates.filter((l) => dates![l.key]?.length)
+  else if (src.complete) kept = candidates
   else {
     const picture = new Map<string, string | null>()
     const queue = [...candidates]

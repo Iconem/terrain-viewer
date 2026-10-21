@@ -1,3 +1,17 @@
+# Changelog — Four Decades a Year at a Time
+
+<!-- released: 2026-10-21 -->
+
+#### TL;DR
+
+- **The app**: Google Earth Timelapse joins the timeline's global catalogs: one cloud-free mosaic a year from 1984 to 2022, 30 m then about 19 m, under the Medium res pill, read from the viewer's own video tiles by a new `gtimelapse://` protocol.
+- **The docs**: a dev page on the protocol and on how Google builds the mosaics, and the NASA Ames Stereo Pipeline and Geopera Parallax noted for making a DEM from stereo imagery.
+
+#### Details
+
+- Google Earth Timelapse: Google published the annual mosaics behind its Timelapse viewer in the Earth Engine Data Catalog under CC BY 4.0, but Earth Engine only serves tiles to a signed-in project. The viewer itself reads one VP9 WebM video per tile from a public bucket, 512 px, five frames a second, a frame per year from 1984. The `gtimelapse://` protocol fetches the video of a tile once, seeks a video element to the year's frame and hands MapLibre a quadrant of it as a 256 px tile, so changing the year re-seeks cached videos and fetches nothing. The catalog, under Historical · Global next to Landsat WELD, gives a tick per year everywhere; every layer covers the globe, so no tile is probed at the view's centre. The bucket is the viewer's, not a documented endpoint, and the mosaics are balanced for the eye, not radiometric; before 1999 a gap in the archive is interpolated between the neighbouring years, so a sudden change inside a gap looks gradual. See [Google Earth Timelapse](https://terrain-viewer.iconem.com/docs/dev/google-timelapse).
+- Docs: [Compared with other tools](https://terrain-viewer.iconem.com/docs/resources/compared-with-other-tools) gains a note on making a DEM from stereo satellite pairs with the NASA Ames Stereo Pipeline, and on Geopera Parallax, a neural matcher that replaces its dense-matching step.
+
 # Changelog — COG Sources End Where the File Does
 
 <!-- released: 2026-10-20 -->

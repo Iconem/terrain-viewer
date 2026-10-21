@@ -29,6 +29,7 @@
     "---Historical---",
     "esri-wayback",
     "ge-historical",
+    "google-timelapse",
     "---Map and UI internals---",
     "camera-sync",
     "map-bounds-and-underzoom",

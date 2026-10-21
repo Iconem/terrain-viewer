@@ -21,6 +21,7 @@
 // capabilities, and every layer answered an image with CORS for a tile in its
 // area; services that failed are listed in the docs (Basemaps and Historical).
 import catalogJson from "./national-historical-catalog.json" with { type: "json" }
+import { TIMELAPSE_YEARS, TIMELAPSE_MAXZOOM, timelapseTileUrl } from "./google-timelapse"
 
 export type Bbox = [number, number, number, number]
 
@@ -55,6 +56,9 @@ export interface NatSource {
   lazy?: boolean
   /** Flight dates at a point, per layer key (exact, from the agency's index). */
   dates?: (lng: number, lat: number, signal?: AbortSignal) => Promise<Record<string, string[]>>
+  /** Every layer covers every point of the extent (a gap-filled global
+   *  mosaic): no tile is probed at the view's centre. */
+  complete?: boolean
 }
 
 const range = (a: number, b: number) => Array.from({ length: b - a + 1 }, (_, i) => a + i)
@@ -252,6 +256,12 @@ export const NATIONAL_SOURCES: NatSource[] = [
     id: "cat-nat-weld", group: "Historical · Global", label: "Landsat WELD annual (NASA GIBS)", short: "WELD", color: "#ddd6fe", bbox: [-180, -85, 180, 85], resClass: "medium",
     note: "NASA's Web-Enabled Landsat Data annual mosaics, 30 m: the years before Sentinel-2 and HLS.", infoUrl: "https://worldview.earthdata.nasa.gov/", licence: "NASA open data",
     layers: WELD_YEARS.map((y) => ({ key: `weld-${y}`, year: y, label: `Landsat WELD ${y}`, url: `https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/Landsat_WELD_CorrectedReflectance_TrueColor_Global_Annual/default/${y}-12-01/GoogleMapsCompatible_Level12/{z}/{y}/{x}.jpg`, type: "tms" as const, maxzoom: 12 })),
+  },  {
+    // The viewer's own video tiles, one frame per year, read by the
+    // gtimelapse:// protocol (lib/google-timelapse.ts).
+    id: "cat-nat-gtimelapse", group: "Historical · Global", label: "Google Earth Timelapse annual", short: "Timelapse", color: "#c7d2fe", bbox: [-180, -85, 180, 85], resClass: "medium", complete: true,
+    note: "Google Earth Timelapse: one cloud-free, gap-filled mosaic a year from 1984 to 2022, 30 m from Landsat then about 19 m with Sentinel-2. Values are balanced for the eye, not radiometric; before 1999 a gap is interpolated between the neighbouring years.", infoUrl: "https://developers.google.com/earth-engine/timelapse/about", licence: "CC BY 4.0, Google Earth Timelapse (Google, Landsat, Copernicus)",
+    layers: TIMELAPSE_YEARS.map((y) => ({ key: `gtl-${y}`, year: y, label: `Timelapse ${y}`, url: timelapseTileUrl(y), type: "tms" as const, maxzoom: TIMELAPSE_MAXZOOM })),
   },
 ]
 // Generated sources: their layers arrive with loadNationalLayers().
