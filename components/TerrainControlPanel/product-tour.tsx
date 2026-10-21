@@ -864,7 +864,7 @@ const HISTORICAL_STEPS: TourStepDef[] = [
     key: "historical-timeline", domId: "tour-historical-timeline", side: "top", align: "center",
     title: "Historical Imagery Timeline",
     description: (
-      <>Timeline activates automatically once at least one grid view is set to the <span className="font-semibold text-foreground">Historical Imagery</span> raster basemap source. Aggregates ESRI Wayback, Google Earth Historical, Bing, Planet Monthly, NASA HLS, and EOX Sentinel-2 into one scrubbable timeline. Click any tick to jump that view to its resolved capture date — each view's handle is colored to match its border above. Dates may take a moment to resolve.</>
+      <>Timeline activates automatically once at least one grid view is set to the <span className="font-semibold text-foreground">Historical Imagery</span> raster basemap source. Aggregates ESRI Wayback, Google Earth Historical, Bing, Planet Monthly, NASA HLS, Landsat 1982+, and EOX Sentinel-2 into one scrubbable timeline. Click any tick to jump that view to its resolved capture date — each view's handle is colored to match its border above. Dates may take a moment to resolve.</>
     ),
     // Tried scrolling to "tour-basemap-section" (the evidence every view
     // resolved to a historical source) instead of this step's own target —

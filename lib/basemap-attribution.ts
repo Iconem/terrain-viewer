@@ -34,6 +34,7 @@ export const STATIC_BASEMAP_ATTRIBUTIONS: Record<string, string> = {
   hls: "NASA/USGS Harmonized Landsat Sentinel-2 (HLS)",
   planet: "© Planet Labs PBC",
   "eox-s2": "Sentinel-2 cloudless — Copernicus Sentinel data, processed by EOX IT Services GmbH",
+  "pc-landsat": "Landsat Collection 2 (USGS/NASA), Microsoft Planetary Computer",
   // These two DO have a real dynamic value (see header comment) — this
   // string is deliberately just a pointer to it, not the value itself,
   // since a <Source>'s `attribution` prop can never be live-updated post-

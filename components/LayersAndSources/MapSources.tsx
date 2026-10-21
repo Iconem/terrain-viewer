@@ -49,6 +49,7 @@ import { hlsTileUrl } from "@/lib/hls"
 import { geHistoricalTileSource } from "@/lib/ge-historical"
 import { planetTileUrl, PLANET_TILE_SIZE, PLANET_MAXZOOM } from "@/lib/planet"
 import { eoxS2CloudlessTileUrl, EOX_S2_TILE_SIZE, EOX_S2_MAXZOOM } from "@/lib/eox-s2-cloudless"
+import { pcLandsatTileUrl, PC_LANDSAT_TILE_SIZE, PC_LANDSAT_MINZOOM, PC_LANDSAT_MAXZOOM } from "@/lib/pc-landsat"
 import { HISTORICAL_BASEMAP_IDS } from "@/lib/historical-sources"
 import { STATIC_BASEMAP_ATTRIBUTIONS } from "@/lib/basemap-attribution"
 import { useDebouncedValue } from "@/hooks/use-debounced-value"
@@ -592,6 +593,11 @@ export const RasterBasemapSource = memo(({
             return { tiles: [eoxS2CloudlessTileUrl(new Date(date).getUTCFullYear())], tileSize: EOX_S2_TILE_SIZE, maxzoom: EOX_S2_MAXZOOM, attribution: STATIC_BASEMAP_ATTRIBUTIONS["eox-s2"] }
         }
 
+        if (basemapSource === "pc-landsat") {
+            if (!date) return null
+            return { tiles: [pcLandsatTileUrl(date)], tileSize: PC_LANDSAT_TILE_SIZE, maxzoom: PC_LANDSAT_MAXZOOM, attribution: STATIC_BASEMAP_ATTRIBUTIONS["pc-landsat"] }
+        }
+
         const basemap = rasterBasemaps[basemapSource] ?? rasterBasemaps.google
         const tileUrl = basemapSource === "mapbox"
             ? basemap.url.replace("{API_KEY}", mapboxKey)
@@ -610,6 +616,8 @@ export const RasterBasemapSource = memo(({
         if (basemapSource === "ge-historical") return { minzoom: 0, maxzoom: 23, isCustom: false }
         if (basemapSource === "planet") return { minzoom: 0, maxzoom: PLANET_MAXZOOM, isCustom: false }
         if (basemapSource === "eox-s2") return { minzoom: 0, maxzoom: EOX_S2_MAXZOOM, isCustom: false }
+        // The Planetary Computer mosaic API answers empty below zoom 8.
+        if (basemapSource === "pc-landsat") return { minzoom: PC_LANDSAT_MINZOOM, maxzoom: PC_LANDSAT_MAXZOOM, isCustom: false }
         const basemap = rasterBasemaps[basemapSource] ?? rasterBasemaps.google
         return { minzoom: 0, maxzoom: basemap.maxzoom, isCustom: false }
     }, [customBasemap, basemapSource])

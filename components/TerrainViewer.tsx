@@ -95,6 +95,7 @@ import { isobandProtocol } from '@/lib/isoband-protocol'
 import { unpaperProtocol } from '@/lib/unpaper-protocol'
 import { epsg3395Protocol } from '@/lib/epsg3395-protocol'
 import { googleTimelapseProtocol } from '@/lib/google-timelapse'
+import { pcMosaicProtocol } from '@/lib/pc-landsat'
 import { ISOLINE_MEASURE_IDS } from '@/lib/isoline-measures'
 import { IsolineLayers } from './LayersAndSources/IsolineLayers'
 import { parseSourceNames, parseSourceMeta } from '@/lib/portable-share-url'
@@ -1907,6 +1908,7 @@ export function TerrainViewer() {
     registerProtocol('unpaper', withTileResultCache(unpaperProtocol))
     registerProtocol('epsg3395', withTileResultCache(epsg3395Protocol))
     registerProtocol('gtimelapse', withTileResultCache(googleTimelapseProtocol))
+    registerProtocol('pcmosaic', withTileResultCache(pcMosaicProtocol))
     registerProtocol('roughness', withTileResultCache(roughnessProtocol))
     registerProtocol('blobness', withTileResultCache(blobnessProtocol))
     // withSlowTileStats composes INSIDE withTileResultCache so it measures the

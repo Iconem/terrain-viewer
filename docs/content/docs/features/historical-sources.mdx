@@ -16,10 +16,11 @@ The sidebar's **Historical Imagery** basemap entry covers these. Which one rende
 | [Google Earth Historical](https://github.com/Iconem/GE_TimeMachine) | Occasional very old captures for well-covered areas, through a reverse-engineered `gehist://` protocol scaffolded from Iconem's own GE_TimeMachine. At low zooms its ticks are yearly Landsat mosaics; zooming in moves the handle to the sharp capture drawn, see [which date is drawn as you zoom](/dev/ge-historical#which-date-is-drawn-as-you-zoom). | VHR |
 | [Bing Aerial](https://www.bing.com/maps/aerial) | No date archive: one live mosaic, which contributes its single current capture date. | VHR |
 | [Planet Monthly Mosaic](https://www.planet.com/products/basemap/) | Monthly mosaics. Needs a Planet API key (Settings → API Keys). | Medium |
-| [NASA HLS](https://hls.gsfc.nasa.gov/) | Harmonized Landsat and Sentinel-2: monthly, coarser resolution. | Medium |
+| [NASA HLS](https://hls.gsfc.nasa.gov/) | Harmonized Landsat and Sentinel-2, 30 m, from 2016: a mosaic of the granules within 15 days of the date, composited on the fly by NASA VEDA's public [titiler-cmr](https://developmentseed.org/titiler-cmr/) from the Common Metadata Repository. | Medium |
+| [Landsat 1982+](https://planetarycomputer.microsoft.com/dataset/landsat-c2-l2) | Landsat 4 to 9 Collection 2 surface reflectance, 30 m, one tick a quarter since 1982: the least cloudy scenes of the quarter, mosaicked on the fly by Microsoft Planetary Computer's mosaic API through the `pcmosaic://` protocol. Scene seams and some cloud remain; tiles from zoom 8. The on-the-fly counterpart of the yearly [Google Earth Timelapse](/dev/google-timelapse) catalog below. | Medium |
 | [EOX Sentinel-2 Cloudless](https://s2maps.eu/) | Yearly cloud-free Sentinel-2 mosaics (2016, then 2018 to 2025). | Medium |
 
-The resolution pills on the timeline filter by class: unset means **VHR** only; the medium-resolution series (NASA HLS, Sentinel-2, Planet monthly, and the Google Earth Timelapse and Landsat WELD catalogs below) need **Medium res** on.
+The resolution pills on the timeline filter by class: unset means **VHR** only; the medium-resolution series (NASA HLS, Landsat 1982+, Sentinel-2, Planet monthly, and the Google Earth Timelapse and Landsat WELD catalogs below) need **Medium res** on.
 
 Wayback and Google Earth Historical are the two genuinely different architectures behind the timeline (release-chained catalog vs. self-contained-per-tile protocol); HLS and Planet are both simple monthly-mosaic lookups:
 
