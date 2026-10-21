@@ -16,7 +16,6 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { OpenInLinksButton } from "./open-in-links"
 import { useWaybackItemsWithLocalChanges, useWaybackRealCaptureDates, sortByDateAscending } from "@/lib/wayback"
 import { syntheticHlsTicks } from "@/lib/hls"
-import { pcLandsatTicks } from "@/lib/pc-landsat"
 import { useGeHistoricalDates } from "@/lib/ge-historical"
 import { planetMonthlyTicks, fetchPlanetMonthlyRange, type PlanetMonthlyRange } from "@/lib/planet"
 import { useBingCaptureDate } from "@/lib/bing"
@@ -72,7 +71,6 @@ const BUILTIN_SOURCE_CONFIG: Record<string, SourceConfig> = {
   planet: { label: "Planet Monthly", fullLabel: "Planet Global Monthly Basemap", shortLabel: "Planet", color: "#fdba74", resClass: "medium" }, // pastel orange
   "eox-s2": { label: "EOX Sentinel 2", fullLabel: "EOX Sentinel-2 Cloudless (Yearly)", shortLabel: "EOX", color: "#fca5a5", resClass: "medium" }, // pastel red
   hls: { label: "NASA HLS", fullLabel: "NASA Harmonized Landsat Sentinel-2", shortLabel: "NASA", color: "#f9a8d4", resClass: "medium" }, // pastel pink
-  "pc-landsat": { label: "Landsat 1982+", fullLabel: "Landsat Collection 2 quarterly mosaics, 1982 to today (Microsoft Planetary Computer)", shortLabel: "Landsat", color: "#99f6e4", resClass: "medium" }, // pastel teal
   // Dated layers of the OSM Editor Layer Index covering the view (orthophotos
   // and historical maps): off by default, since it loads the index.
   // Catalog sources (lib/timeline-catalogs.ts): picked from the Catalogs
@@ -510,12 +508,6 @@ export const HistoricalTimelinePanel: React.FC<{ state: any; setState: (updates:
     () => syntheticHlsTicks().map((t) => ({ source: "hls", key: t.dateMs, dateMs: t.dateMs, label: t.label })),
     [],
   )
-  // One tick a quarter since 1982 (see lib/pc-landsat.ts): a search window,
-  // not a verified capture at the view.
-  const pcLandsatTickList = useMemo<TimelineTick[]>(
-    () => pcLandsatTicks().map((t) => ({ source: "pc-landsat", key: t.dateMs, dateMs: t.dateMs, label: t.label })),
-    [],
-  )
   const { items: rawGeItems, coarserDates: geCoarserDates, loading: geDatesLoading } = useGeHistoricalDates(state.lat, state.lng, state.zoom)
   const geTicks = useMemo<TimelineTick[]>(
     () => rawGeItems.map((t) => ({ source: "ge-historical", key: t.dateMs, dateMs: t.dateMs, label: t.label })),
@@ -702,8 +694,8 @@ export const HistoricalTimelinePanel: React.FC<{ state: any; setState: (updates:
   }, [activeViews.join(","), activeBasemapSourceFor, customBasemaps.length, catalogTicks])
   const catalogTickList = useMemo(() => catalogsToLoad.flatMap((id) => catalogTicks[id] ?? []), [catalogsToLoad, catalogTicks])
   const allTicks = useMemo(
-    () => [...waybackTicks, ...hlsTicks, ...pcLandsatTickList, ...geTicks, ...planetTicks, ...bingTicks, ...eoxS2Ticks, ...catalogTickList].sort((a, b) => a.dateMs - b.dateMs),
-    [waybackTicks, hlsTicks, pcLandsatTickList, geTicks, planetTicks, bingTicks, eoxS2Ticks, catalogTickList],
+    () => [...waybackTicks, ...hlsTicks, ...geTicks, ...planetTicks, ...bingTicks, ...eoxS2Ticks, ...catalogTickList].sort((a, b) => a.dateMs - b.dateMs),
+    [waybackTicks, hlsTicks, geTicks, planetTicks, bingTicks, eoxS2Ticks, catalogTickList],
   )
   // NEAREST match, not exact equality — a stored date (state.dateA-F) and a
   // wayback tick's own real.dateMs both ultimately come from Esri's

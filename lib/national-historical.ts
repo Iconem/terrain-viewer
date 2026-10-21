@@ -22,6 +22,7 @@
 // area; services that failed are listed in the docs (Basemaps and Historical).
 import catalogJson from "./national-historical-catalog.json" with { type: "json" }
 import { TIMELAPSE_YEARS, TIMELAPSE_MAXZOOM, timelapseTileUrl } from "./google-timelapse"
+import { PC_COLLECTIONS, pcMosaicTileUrl, pcQuarters, pcMonths } from "./pc-mosaic"
 
 export type Bbox = [number, number, number, number]
 
@@ -30,6 +31,9 @@ export interface NatLayer {
   /** Start year, or the flight date when known exactly. */
   year: number
   endYear?: number
+  /** The tick's date when the layer is not a whole year (a quarter, a
+   *  month); 1 January of `year` otherwise. */
+  dateMs?: number
   label: string
   url: string
   type: "tms" | "wms"
@@ -262,6 +266,18 @@ export const NATIONAL_SOURCES: NatSource[] = [
     id: "cat-nat-gtimelapse", group: "Historical · Global", label: "Google Earth Timelapse annual", short: "Timelapse", color: "#c7d2fe", bbox: [-180, -85, 180, 85], resClass: "medium", complete: true,
     note: "Google Earth Timelapse: one cloud-free, gap-filled mosaic a year from 1984 to 2022, 30 m from Landsat then about 19 m with Sentinel-2. Values are balanced for the eye, not radiometric; before 1999 a gap is interpolated between the neighbouring years.", infoUrl: "https://developers.google.com/earth-engine/timelapse/about", licence: "CC BY 4.0, Google Earth Timelapse (Google, Landsat, Copernicus)",
     layers: TIMELAPSE_YEARS.map((y) => ({ key: `gtl-${y}`, year: y, label: `Timelapse ${y}`, url: timelapseTileUrl(y), type: "tms" as const, maxzoom: TIMELAPSE_MAXZOOM })),
+  },
+  {
+    // Scenes mosaicked on the fly by Planetary Computer's data API through
+    // the pcmosaic:// protocol (lib/pc-mosaic.ts): a window per layer.
+    id: "cat-nat-mspc-landsat", group: "Historical · Global", label: "Landsat 1982+ quarterly (Microsoft Planetary Computer)", short: "MSPC Landsat", color: "#99f6e4", bbox: [-180, -85, 180, 85], resClass: "medium", complete: true,
+    note: "Landsat 4 to 9 Collection 2 surface reflectance, 30 m, a quarter at a time since 1982: the quarter's least cloudy scenes (10 % cloud, then 60 % where none), mosaicked on the fly by Microsoft Planetary Computer. Scene seams and some cloud remain; tiles from zoom 8.", infoUrl: "https://planetarycomputer.microsoft.com/dataset/landsat-c2-l2", licence: "USGS/NASA Landsat, public domain; served by Microsoft Planetary Computer",
+    layers: pcQuarters().map((w) => ({ key: `ls-${w.label.replace(" ", "")}`, year: w.year, dateMs: w.fromMs + 4 * 86400000, label: `Landsat ${w.label}`, url: pcMosaicTileUrl("landsat-c2-l2", w.fromMs, w.toMs), type: "tms" as const, minzoom: PC_COLLECTIONS["landsat-c2-l2"].minzoom, maxzoom: PC_COLLECTIONS["landsat-c2-l2"].maxzoom })),
+  },
+  {
+    id: "cat-nat-mspc-s2", group: "Historical · Global", label: "Sentinel-2 2016+ monthly (Microsoft Planetary Computer)", short: "MSPC Sentinel-2", color: "#a5f3fc", bbox: [-180, -85, 180, 85], resClass: "medium", complete: true,
+    note: "Sentinel-2 L2A true colour, 10 m, a month at a time since 2016: the month's least cloudy scenes (10 % cloud, then 60 % where none), mosaicked on the fly by Microsoft Planetary Computer. Scene seams and some cloud remain; tiles from zoom 9.", infoUrl: "https://planetarycomputer.microsoft.com/dataset/sentinel-2-l2a", licence: "Copernicus Sentinel data, free and open; served by Microsoft Planetary Computer",
+    layers: pcMonths().map((w) => ({ key: `s2-${w.label}`, year: w.year, dateMs: w.fromMs + 5 * 86400000, label: `Sentinel-2 ${w.label}`, url: pcMosaicTileUrl("sentinel-2-l2a", w.fromMs, w.toMs), type: "tms" as const, minzoom: PC_COLLECTIONS["sentinel-2-l2a"].minzoom, maxzoom: PC_COLLECTIONS["sentinel-2-l2a"].maxzoom })),
   },
 ]
 // Generated sources: their layers arrive with loadNationalLayers().

@@ -17,7 +17,7 @@ In October 2026 Google released the mosaics behind its [Timelapse viewer](https:
 
 No other open series offers a yearly, cloud-free, global mosaic at this resolution before 2015: NASA's Landsat WELD on GIBS stops at three epochs (1984-85, 1989-90, 1999-2000), HLS starts in 2013, EOX's Sentinel-2 cloudless in 2016. The Earth Engine asset, though, only serves tiles to a signed-in Earth Engine project, which the app cannot be.
 
-The on-the-fly alternative is the **Landsat 1982+** pill (`lib/pc-landsat.ts`): Microsoft Planetary Computer's mosaic API tiles any Landsat Collection 2 search without a token, so a quarter of any year since 1982 can be drawn from the least cloudy scenes, with their seams and residual cloud. Timelapse is the clean yearly frame, Planetary Computer the raw archive at any season; both sit under the Medium res pill.
+The on-the-fly alternatives sit in the same World group: the **Landsat 1982+ quarterly** and **Sentinel-2 2016+ monthly** catalogs, where Microsoft Planetary Computer's mosaic API tiles a STAC search without a token, so any quarter since 1982 or any month since 2016 can be drawn from the least cloudy scenes, with their seams and residual cloud (see [On-the-fly mosaics](/dev/on-the-fly-mosaics)). Timelapse is the clean yearly frame, Planetary Computer the raw archive at any season; all three sit under the Medium res pill.
 
 ## Where the tiles come from
 

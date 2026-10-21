@@ -9,23 +9,22 @@ import { syntheticHlsTicks, hlsTileUrl } from "./hls"
 import { listGeHistoricalTicksInRange, geHistoricalTileSource, fetchGeHistoricalTileBlob } from "./ge-historical"
 import { planetMonthlyTicks, planetTileUrl } from "./planet"
 import { eoxS2CloudlessTicks, eoxS2CloudlessTileUrl } from "./eox-s2-cloudless"
-import { pcLandsatTicks, pcLandsatTileUrl, fetchPcLandsatTileBlob, PC_LANDSAT_MAXZOOM } from "./pc-landsat"
 import { fetchBingCaptureDate, toQuadkey } from "./bing"
 import type { FetchRgbTileMosaicOptions } from "./rgb-tile-mosaic"
 
-export const EXPORT_SOURCE_IDS = ["wayback", "hls", "pc-landsat", "ge-historical", "planet", "eox-s2", "bing", "google", "esri", "mapbox", "maptiler", "here"] as const
+export const EXPORT_SOURCE_IDS = ["wayback", "hls", "ge-historical", "planet", "eox-s2", "bing", "google", "esri", "mapbox", "maptiler", "here"] as const
 export type ExportSourceId = (typeof EXPORT_SOURCE_IDS)[number]
 /** The non-archival providers: one current mosaic each, no date range. Bing
  *  is the odd one out only in that it can report its capture date. */
 export const CURRENT_BASEMAP_SOURCE_IDS: readonly ExportSourceId[] = ["bing", "google", "esri", "mapbox", "maptiler", "here"]
 export const EXPORT_SOURCE_LABELS: Record<ExportSourceId, string> = {
-  wayback: "Esri Wayback", hls: "HLS", "pc-landsat": "Landsat 1982+", "ge-historical": "GE Historical", planet: "Planet", "eox-s2": "EOX Sentinel-2",
+  wayback: "Esri Wayback", hls: "HLS", "ge-historical": "GE Historical", planet: "Planet", "eox-s2": "EOX Sentinel-2",
   bing: "Bing (current)", google: "Google (current)", esri: "Esri (current)", mapbox: "Mapbox (current)", maptiler: "MapTiler (current)", here: "HERE (current)",
 }
 /** Filename stem per source - the provider name rather than the internal id
  *  ("esri-wayback" beats "wayback" when a file turns up out of context). */
 export const EXPORT_SOURCE_FILE_STEMS: Record<ExportSourceId, string> = {
-  wayback: "esri-wayback", hls: "nasa-hls", "pc-landsat": "landsat-pc", "ge-historical": "google-earth", planet: "planet", "eox-s2": "eox-sentinel2",
+  wayback: "esri-wayback", hls: "nasa-hls", "ge-historical": "google-earth", planet: "planet", "eox-s2": "eox-sentinel2",
   bing: "bing", google: "google", esri: "esri", mapbox: "mapbox", maptiler: "maptiler", here: "here",
 }
 /** Keys some current basemaps need; a missing key makes that source list nothing. */
@@ -93,16 +92,6 @@ export async function listExportTicks(
       .map((t) => ({
         dateMs: t.dateMs, label: dateLabel(t.dateMs),
         tileSpec: { tileUrlTemplate: hlsTileUrl(t.dateMs), tileSize: 256, maxzoom: 16 },
-      }))
-  }
-  if (sourceId === "pc-landsat") {
-    return pcLandsatTicks()
-      .filter((t) => t.dateMs >= startMs && t.dateMs <= endMs)
-      .map((t) => ({
-        dateMs: t.dateMs, label: dateLabel(t.dateMs),
-        // pcmosaic:// registers a search with a POST: the mosaic goes
-        // through fetchTileBlob, as Google Earth Historical does.
-        tileSpec: { tileUrlTemplate: pcLandsatTileUrl(t.dateMs), tileSize: 256, maxzoom: PC_LANDSAT_MAXZOOM, fetchTileBlob: (z, x, y, signal) => fetchPcLandsatTileBlob(z, x, y, t.dateMs, signal) },
       }))
   }
   if (sourceId === "ge-historical") {

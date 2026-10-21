@@ -34,7 +34,7 @@ const DEFAULT_SOURCE_IDS: ExportSourceId[] = ["wayback", "ge-historical", ...CUR
 // Ordered for the picker: very-high-resolution archives first (Wayback, then
 // Google Earth right under it), a rule, then the medium-resolution ones.
 const HISTORICAL_VHR_IDS: readonly ExportSourceId[] = ["wayback", "ge-historical"]
-const HISTORICAL_MEDIUM_IDS: readonly ExportSourceId[] = ["hls", "pc-landsat", "eox-s2", "planet"]
+const HISTORICAL_MEDIUM_IDS: readonly ExportSourceId[] = ["hls", "eox-s2", "planet"]
 const HISTORICAL_SOURCE_IDS: readonly ExportSourceId[] = [...HISTORICAL_VHR_IDS, ...HISTORICAL_MEDIUM_IDS]
 
 /** Label + one multi-select control on a single line: "All" first, then
