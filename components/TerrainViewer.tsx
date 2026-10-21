@@ -3236,8 +3236,13 @@ export function TerrainViewer() {
   // rendered at all, so a timeline scrubbing an invisible layer is noise.
   // (Historical mode always shows the basemap; see the opacity forcing in
   // the per-view render below.) The panel mirrors this same gate itself.
-  const historicalTimelineActive = isHistoricalSourceActive(state)
-    && (isHistoricalMode || state.showRasterBasemap)
+  // In historical mode the timeline is always reachable (the panel, or the
+  // collapsed toggle): with every source pill off and the view moved to a
+  // plain basemap, nothing was left on screen to bring it back, and only a
+  // Bing capture date could (Jonathan, 2026-10-21). A view not on a
+  // historical source shows no handle; a tick click puts it on one.
+  const historicalTimelineActive = isHistoricalMode
+    || (isHistoricalSourceActive(state) && state.showRasterBasemap)
   const historicalTimelineVisible = historicalTimelineActive && !state.historicalTimelineCollapsed
   const isBasemapCustom = customBasemapSources.some(s => s.id === activeBasemapSourceA)
 
